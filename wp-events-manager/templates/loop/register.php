@@ -56,7 +56,7 @@ if ( absint( $event->qty ) == 0 || get_post_meta( get_the_ID(), 'tp_event_status
 	</ul>
 
 	<?php if ( is_user_logged_in() ) { ?>
-		<a class="wpems_g_calendar_url" href="<?php esc_attr( $g_calendar_link ); ?>" target="_blank"><img src="https://www.google.com/calendar/images/ext/gc_button2.gif" alt="0" border="0"></a>
+		<a class="wpems_g_calendar_url" href="<?php echo esc_attr( $g_calendar_link ); ?>" target="_blank"><img src="https://www.google.com/calendar/images/ext/gc_button2.gif" alt="0" border="0"></a>
 		<?php
 		$registered_time = $event->booked_quantity( get_current_user_id() );
 		if ( $registered_time && wpems_get_option( 'email_register_times' ) === 'once' && $event->is_free() ) {
