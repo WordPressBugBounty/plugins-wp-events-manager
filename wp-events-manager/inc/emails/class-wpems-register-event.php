@@ -37,10 +37,10 @@ class WPEMS_Email_Register_Event {
 			return;
 		}
 
-		$booking = WPEMS_Booking::instance( $booking_id );
+		$booking = \WPEMS\Models\BookingPostModel::find( absint( $booking_id ) );
 
 		if ( $booking ) {
-			$user_id = $booking->user_id;
+			$user_id = $booking->get_user_id();
 			if ( ! $user_id ) {
 				throw new Exception( __( 'User is not exists!', 'wp-events-manager' ) );
 				die();
@@ -72,19 +72,19 @@ class WPEMS_Email_Register_Event {
 					'event-title'      => '{event_title}',
 				);
 				$return     = array();
-				$return[]   = sprintf( '%s', wpems_booking_status( $booking->ID ) );
-				$return[]   = $booking->payment_id ? sprintf( '(%s)', wpems_get_payment_title( $booking->payment_id ) ) : '';
+				$return[]   = sprintf( '%s', wpems_booking_status( $booking->get_id() ) );
+				$return[]   = $booking->get_payment_id() ? sprintf( '(%s)', wpems_get_payment_title( $booking->get_payment_id() ) ) : '';
 				$replace    = array(
-					'user-displayname' => $user->data->display_name,
-					'user-link'        => wpems_account_url(),
-					'event-link'       => get_permalink( $booking->event_id ),
-					'event-type'       => floatval( $booking->price ) == 0 ? __( 'Free', 'wp-events-manager' ) : __( 'Cost', 'wp-events-manager' ),
-					'booking-id'       => $booking->ID,
-					'booking-quantity' => $booking->qty,
-					'booking-price'    => wpems_format_price( floatval( $booking->price ), true ),
-					'booking-payment'  => $booking->payment_id ? wpems_get_payment_title( $booking->payment_id ) : __( 'No payment', 'wp-events-manager' ),
-					'booking-status'   => implode( '', $return ),
-					'event-title'      => get_the_title( $booking->event_id ),
+					'user-displayname' => esc_html( $user->data->display_name ),
+					'user-link'        => esc_url( wpems_account_url() ),
+					'event-link'       => esc_url( get_permalink( $booking->get_event_id() ) ),
+					'event-type'       => $booking->get_price() == 0 ? __( 'Free', 'wp-events-manager' ) : __( 'Cost', 'wp-events-manager' ),
+					'booking-id'       => esc_html( $booking->get_id() ),
+					'booking-quantity' => esc_html( $booking->get_quantity() ),
+					'booking-price'    => wp_kses_post( wpems_format_price( $booking->get_price(), true ) ),
+					'booking-payment'  => esc_html( $booking->get_payment_id() ? wpems_get_payment_title( $booking->get_payment_id() ) : __( 'No payment', 'wp-events-manager' ) ),
+					'booking-status'   => wp_kses_post( implode( '', $return ) ),
+					'event-title'      => esc_html( get_the_title( $booking->get_event_id() ) ),
 				);
 				$email_body = str_replace( $find, $replace, $email_body );
 
@@ -125,12 +125,11 @@ class WPEMS_Email_Register_Event {
 	// set from name
 	public function from_name( $name ) {
 		if ( $name = wpems_get_option( 'email_from_name' ) ) {
-			return $name;
+			return sanitize_text_field( $name );
 		}
 
 		return $name;
 	}
-
 }
 
 new WPEMS_Email_Register_Event();

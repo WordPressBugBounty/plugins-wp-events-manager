@@ -32,7 +32,6 @@ class WPEMS_Booking {
 		if ( $this->post ) {
 			$this->ID = $this->post->ID;
 		}
-
 	}
 
 	/**
@@ -45,7 +44,6 @@ class WPEMS_Booking {
 	public function __get( $key = null ) {
 
 		switch ( $key ) {
-
 			default:
 				$result = get_post_meta( $this->ID, 'ea_booking_' . $key, true );
 				break;
@@ -134,7 +132,8 @@ class WPEMS_Booking {
 			return self::$instance[ $booking_id ];
 		}
 
-		return self::$instance[ $booking_id ] = new self( $booking_id );
-	}
+		self::$instance[ $booking_id ] = new self( $booking_id );
 
+		return self::$instance[ $booking_id ];
+	}
 }

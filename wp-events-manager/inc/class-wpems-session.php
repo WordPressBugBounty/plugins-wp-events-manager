@@ -16,24 +16,28 @@ class WPEMS_Session {
 
 	/**
 	 * array key of session or cookie
+	 *
 	 * @var type string
 	 */
 	private $_name = null;
 
 	/**
 	 * is change is TRUE if has change $_data
+	 *
 	 * @var type bool
 	 */
 	private $_is_changed = false;
 
 	/**
 	 * session data
+	 *
 	 * @var type array
 	 */
 	private $_data = array();
 
 	/**
 	 * live time of cookie
+	 *
 	 * @var type timestamp
 	 */
 	private $_live_time = null;
@@ -50,7 +54,7 @@ class WPEMS_Session {
 	 * @param type $name
 	 */
 	public function __get( $name ) {
-		$this->get( $name );
+		return $this->get( $name );
 	}
 
 	/**
@@ -95,7 +99,7 @@ class WPEMS_Session {
 	 * @return type
 	 */
 	public function get( $name = null, $default = null ) {
-		return isset( $this->_data[ $name ] ) ? maybe_unserialize( $this->_data[ $name ] ) : $default;
+		return isset( $this->_data[ $name ] ) ? $this->safe_maybe_unserialize( $this->_data[ $name ] ) : $default;
 	}
 
 	/**
@@ -123,10 +127,55 @@ class WPEMS_Session {
 
 	/**
 	 * get session data
+	 *
 	 * @return array
 	 */
 	private function get_session_data() {
-		return isset( $_SESSION[ $this->_name ] ) ? maybe_unserialize( $_SESSION[ $this->_name ] ) : array();
+		$data = isset( $_SESSION[ $this->_name ] ) ? $this->safe_maybe_unserialize( $_SESSION[ $this->_name ] ) : array();
+
+		return is_array( $data ) ? $data : array();
 	}
 
+	/**
+	 * Safely unserialize internal session values without allowing objects.
+	 *
+	 * @param mixed $value Raw session value.
+	 *
+	 * @return mixed
+	 */
+	private function safe_maybe_unserialize( $value ) {
+		if ( ! is_string( $value ) ) {
+			return $value;
+		}
+
+		$trimmed = trim( $value );
+		$data    = @unserialize( $trimmed, array( 'allowed_classes' => false ) );
+
+		if ( false === $data && 'b:0;' !== $trimmed ) {
+			return $value;
+		}
+
+		return $this->remove_unserialized_objects( $data );
+	}
+
+	/**
+	 * Remove any object values returned from serialized session data.
+	 *
+	 * @param mixed $value Unserialized value.
+	 *
+	 * @return mixed
+	 */
+	private function remove_unserialized_objects( $value ) {
+		if ( is_object( $value ) ) {
+			return null;
+		}
+
+		if ( is_array( $value ) ) {
+			foreach ( $value as $key => $item ) {
+				$value[ $key ] = $this->remove_unserialized_objects( $item );
+			}
+		}
+
+		return $value;
+	}
 }

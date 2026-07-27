@@ -16,6 +16,7 @@ class WPEMS_Template {
 
 	/**
 	 * Path to the includes directory
+	 *
 	 * @var string
 	 */
 	private $include_path = '';

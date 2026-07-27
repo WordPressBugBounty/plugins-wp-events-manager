@@ -1,43 +1,212 @@
 <?php
 /**
- * WP Event Manager Unit Tests Bootstrap
+ * WP Events Manager unit test bootstrap.
  *
- * @since 2.0
+ * @package WPEMS\Tests
  */
-class WPEMS_Unit_Tests_Bootstrap {
-	/** @var WPEMS_Unit_Tests_Bootstrap instance */
-	protected static $instance = null;
-	/** @var string directory where wordpress-tests-lib is installed */
-	public $wp_tests_dir;
-	/** @var string testing directory */
-	public $tests_dir;
-	/** @var string plugin directory */
-	public $plugin_dir;
+
+ini_set( 'display_errors', 'on' );
+error_reporting( E_ALL );
+
+if ( ! isset( $_SERVER['SERVER_NAME'] ) ) {
+	$_SERVER['SERVER_NAME'] = 'localhost';
+}
+
+$plugin_dir = dirname( __DIR__ );
+
+defined( 'ABSPATH' ) || define( 'ABSPATH', dirname( dirname( dirname( dirname( $plugin_dir ) ) ) ) . '/' );
+defined( 'WPEMS_PATH' ) || define( 'WPEMS_PATH', $plugin_dir . '/' );
+defined( 'WPEMS_INC' ) || define( 'WPEMS_INC', WPEMS_PATH . 'inc/' );
+defined( 'WPEMS_INC_URI' ) || define( 'WPEMS_INC_URI', 'https://example.test/wp-content/plugins/wp-events-manager/inc/' );
+defined( 'WPEMS_VER' ) || define( 'WPEMS_VER', 'test' );
+
+require_once $plugin_dir . '/vendor/autoload.php';
+require_once __DIR__ . '/Unit/TestCase.php';
+
+if ( ! class_exists( 'WP_Post' ) ) {
 	/**
-	 * Setup the unit testing environment.
-	 *
-	 * @since 2.0
+	 * Minimal WP_Post test double.
 	 */
-	public function __construct() {
-		ini_set( 'display_errors','on' );
-		error_reporting( E_ALL );
-		// Ensure server variable is set for WP email functions.
-		if ( ! isset( $_SERVER['SERVER_NAME'] ) ) {
-			$_SERVER['SERVER_NAME'] = 'localhost';
+	class WP_Post {
+		/**
+		 * Common WP_Post fields.
+		 *
+		 * @var mixed
+		 */
+		public $ID, $post_author, $post_date, $post_date_gmt, $post_modified, $post_modified_gmt, $post_content, $post_title, $post_excerpt, $post_status, $post_password, $post_name, $post_type, $post_parent, $filter;
+
+		/**
+		 * Map arbitrary post fields.
+		 *
+		 * @param array|object $data Post-like data.
+		 */
+		public function __construct( $data = array() ) {
+			foreach ( (array) $data as $key => $value ) {
+				$this->{$key} = $value;
+			}
 		}
 	}
+}
+
+if ( ! class_exists( 'WP_Error' ) ) {
+	/**
+	 * Minimal WP_Error test double.
+	 */
+	class WP_Error {
+		/**
+		 * Error message.
+		 *
+		 * @var string
+		 */
+		private $message = '';
+
+		/**
+		 * Constructor.
+		 *
+		 * @param string $code    Error code.
+		 * @param string $message Error message.
+		 */
+		public function __construct( $code = '', $message = '' ) {
+			$this->message = $message;
+		}
+
+		/**
+		 * Get error message.
+		 *
+		 * @return string
+		 */
+		public function get_error_message(): string {
+			return $this->message;
+		}
+	}
+}
+
+if ( ! class_exists( 'WPEMS_Shortcodes' ) ) {
+	/**
+	 * Minimal shortcode renderer double.
+	 */
+	class WPEMS_Shortcodes {
+		/**
+		 * Last render call.
+		 *
+		 * @var array
+		 */
+		public static $last_render = array();
+
+		/**
+		 * Reset call state.
+		 *
+		 * @return void
+		 */
+		public static function reset() {
+			self::$last_render = array();
+		}
+
+		/**
+		 * Render a shortcode template.
+		 *
+		 * @param string $shortcode Shortcode key.
+		 * @param string $template  Template file.
+		 * @param array  $args      Template args.
+		 *
+		 * @return string
+		 */
+		public static function render( $shortcode = '', $template = '', $args = array() ): string {
+			self::$last_render = func_get_args();
+
+			return 'rendered:' . $shortcode;
+		}
+
+		/**
+		 * Render list shortcode.
+		 *
+		 * @param array $atts Shortcode atts.
+		 *
+		 * @return string
+		 */
+		public static function list_event( $atts ): string {
+			return self::render( 'list-event', 'list-event.php', array( 'atts' => $atts ) );
+		}
+
+		/**
+		 * Render login shortcode.
+		 *
+		 * @param array $atts Shortcode atts.
+		 *
+		 * @return string
+		 */
+		public static function login( $atts ): string {
+			return self::render( 'login', 'login.php', array( 'atts' => $atts ) );
+		}
+
+		/**
+		 * Render account shortcode.
+		 *
+		 * @param array $atts Shortcode atts.
+		 *
+		 * @return string
+		 */
+		public static function account( $atts ): string {
+			return self::render( 'account', 'account.php', array( 'atts' => $atts ) );
+		}
+
+		/**
+		 * Render countdown shortcode.
+		 *
+		 * @param array $atts Shortcode atts.
+		 *
+		 * @return string
+		 */
+		public static function countdown( $atts ): string {
+			return self::render( 'countdown', 'countdown.php', array( 'atts' => $atts ) );
+		}
+
+		/**
+		 * Wrapper start placeholder.
+		 *
+		 * @return void
+		 */
+		public static function shortcode_wrapper_start() {}
+
+		/**
+		 * Wrapper end placeholder.
+		 *
+		 * @return void
+		 */
+		public static function shortcode_wrapper_end() {}
+
+		/**
+		 * Auto shortcode placeholder.
+		 *
+		 * @return void
+		 */
+		public static function auto_shortcode() {}
+	}
+}
+
+/**
+ * Compatibility wrapper for legacy test bootstrap callers.
+ */
+class WPEMS_Unit_Tests_Bootstrap {
+	/**
+	 * Singleton instance.
+	 *
+	 * @var self|null
+	 */
+	protected static $instance = null;
 
 	/**
-	 * Get the single class instance.
+	 * Get instance.
 	 *
-	 * @since 2.0
-	 * @return WPEMS_Unit_Tests_Bootstrap
+	 * @return self
 	 */
-	public static function instance() {
-		if ( is_null( self::$instance ) ) {
+	public static function instance(): self {
+		if ( null === self::$instance ) {
 			self::$instance = new self();
 		}
+
 		return self::$instance;
 	}
 }
+
 WPEMS_Unit_Tests_Bootstrap::instance();

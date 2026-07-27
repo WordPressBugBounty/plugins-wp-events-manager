@@ -64,16 +64,17 @@ class WPEMS_User_Process {
 	 * Process Register
 	 */
 	public static function process_register() {
-		if ( empty( $_POST['auth-nonce'] ) || ! wp_verify_nonce( $_POST['auth-nonce'], 'auth-reigter-nonce' ) ) {
+
+		$nonce = ! empty( $_POST['auth-nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['auth-nonce'] ) ) : '';
+		if ( ! $nonce || ! wp_verify_nonce( $nonce, 'auth-reigter-nonce' ) ) {
 			return;
 		}
 
-		$username  = ! empty( $_POST['user_login'] ) ? $_POST['user_login'] : '';
-		$email     = ! empty( $_POST['user_email'] ) ? $_POST['user_email'] : '';
-		$password  = ! empty( $_POST['user_pass'] ) ? $_POST['user_pass'] : '';
-		$password1 = ! empty( $_POST['confirm_password'] ) ? $_POST['confirm_password'] : '';
-
-		$user_id = wpems_create_new_user(
+		$username  = ! empty( $_POST['user_login'] ) ? sanitize_user( wp_unslash( $_POST['user_login'] ), true ) : '';
+		$email     = ! empty( $_POST['user_email'] ) ? sanitize_email( wp_unslash( $_POST['user_email'] ) ) : '';
+		$password  = ! empty( $_POST['user_pass'] ) ? wp_unslash( $_POST['user_pass'] ) : '';
+		$password1 = ! empty( $_POST['confirm_password'] ) ? wp_unslash( $_POST['confirm_password'] ) : '';
+		$user_id   = wpems_create_new_user(
 			apply_filters(
 				'event_auth_user_process_register_data',
 				array(
@@ -139,26 +140,26 @@ class WPEMS_User_Process {
 	 */
 	public static function process_login() {
 
-		$nonce_value = isset( $_POST['_wpnonce'] ) ? sanitize_text_field( $_POST['_wpnonce'] ) : '';
-		$nonce_value = isset( $_POST['auth-nonce'] ) ? sanitize_text_field( $_POST['auth-nonce'] ) : $nonce_value;
+		$nonce_value = isset( $_POST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ) : '';
+		$nonce_value = isset( $_POST['auth-nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['auth-nonce'] ) ) : $nonce_value;
 
 		if ( ! wp_verify_nonce( $nonce_value, 'auth-login-nonce' ) ) {
 			return;
 		}
 		$redirect = self::$account_url;
-		if ( ! empty( $_POST['redirect_to'] ) && $_POST['redirect_to'] !== '/wp-admin/admin-ajax.php' ) {
-			$redirect = esc_url( $_POST['redirect_to'] );
+		if ( ! empty( $_POST['redirect_to'] ) && wp_unslash( $_POST['redirect_to'] ) !== '/wp-admin/admin-ajax.php' ) {
+			$redirect = wp_validate_redirect( wp_unslash( $_POST['redirect_to'] ), self::$account_url );
 		} elseif ( wp_get_referer() ) {
-			$redirect = wp_get_referer();
+			$redirect = wp_validate_redirect( wp_get_referer(), self::$account_url );
 		}
 
-		$redirect = strpos( $redirect, '/wp-admin/admin-ajax.php' ) ? self::$account_url : $redirect;
+		$redirect = strpos( $redirect, '/wp-admin/admin-ajax.php' ) ? self::$account_url : wp_validate_redirect( $redirect, self::$account_url );
 
 		try {
 
 			$creds    = array();
-			$username = ! empty( $_POST['user_login'] ) ? sanitize_text_field( trim( $_POST['user_login'] ) ) : '';
-			$password = ! empty( $_POST['user_pass'] ) ? sanitize_text_field( trim( $_POST['user_pass'] ) ) : '';
+			$username = ! empty( $_POST['user_login'] ) ? sanitize_text_field( trim( wp_unslash( $_POST['user_login'] ) ) ) : '';
+			$password = ! empty( $_POST['user_pass'] ) ? wp_unslash( $_POST['user_pass'] ) : '';
 
 			$validation_error = new WP_Error();
 			$validation_error = apply_filters( 'event_auth_process_login_errors', $validation_error, $username, $password );
@@ -201,12 +202,12 @@ class WPEMS_User_Process {
 					wpems_add_notice( 'error', $message );
 
 					// break
-					throw new Exception;
+					throw new Exception();
 				} else {
 					wpems_add_notice( 'success', __( 'You have logged in', 'wp-events-manager' ) );
 
 					if ( ! defined( 'DOING_AJAX' ) || ! DOING_AJAX ) {
-						wp_redirect( apply_filters( 'event_auth_login_redirect', $redirect, $user ) );
+						wp_safe_redirect( apply_filters( 'event_auth_login_redirect', $redirect, $user ) );
 						exit;
 					} else {
 						$response             = array();
@@ -240,16 +241,13 @@ class WPEMS_User_Process {
 	 * Process Lost Password
 	 */
 	public static function process_lost_password() {
-
 	}
 
 	/**
 	 * Process Reset Password
 	 */
 	public static function process_reset_password() {
-
 	}
-
 }
 
 WPEMS_User_Process::init();

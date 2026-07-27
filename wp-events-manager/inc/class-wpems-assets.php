@@ -19,18 +19,21 @@ class WPEMS_Assets {
 
 	/**
 	 * styles
+	 *
 	 * @var type array
 	 */
 	public static $_styles = array();
 
 	/**
 	 * scripts
+	 *
 	 * @var type array
 	 */
 	public static $_scripts = array();
 
 	/**
 	 * localize
+	 *
 	 * @var type array
 	 */
 	public static $_localize_scripts = array();
@@ -44,7 +47,7 @@ class WPEMS_Assets {
 	 * register script
 	 */
 	public static function register_script( $handle = '', $src = '', $deps = array(), $ver = false, $in_footer = true ) {
-		self::$_scripts[$handle] = array( $handle, self::_load_file_min( $src ), $deps, $ver, $in_footer );
+		self::$_scripts[ $handle ] = array( $handle, self::_load_file_min( $src ), $deps, $ver, $in_footer );
 	}
 
 	/**
@@ -61,7 +64,7 @@ class WPEMS_Assets {
 			$uri = self::_load_file_min( $src );
 		}
 
-		self::$_styles[$handle] = array( $handle, $uri, $deps, $ver, $media );
+		self::$_styles[ $handle ] = array( $handle, $uri, $deps, $ver, $media );
 	}
 
 	/**
@@ -72,7 +75,7 @@ class WPEMS_Assets {
 	 * @param type $data
 	 */
 	public static function localize_script( $handle, $name, $data ) {
-		self::$_localize_scripts[$handle] = array( $handle, $name, $data );
+		self::$_localize_scripts[ $handle ] = array( $handle, $name, $data );
 	}
 
 	/**
@@ -84,18 +87,14 @@ class WPEMS_Assets {
 		 */
 		do_action( 'tp_event_before_enqueue_scripts', $hook );
 
-		wp_enqueue_script( 'jquery' );
-		// wp_dequeue_script( 'jquery-ui-datepicker' );
-		wp_enqueue_script( 'jquery-ui-core' );
 		wp_enqueue_script( 'wp-util' );
 		wp_enqueue_script( 'backbone' );
 		wp_enqueue_script( 'underscore' );
-
 		if ( self::$_scripts ) {
 			foreach ( self::$_scripts as $handle => $param ) {
 				call_user_func_array( 'wp_register_script', $param );
 				if ( array_key_exists( $handle, self::$_localize_scripts ) ) {
-					call_user_func_array( 'wp_localize_script', self::$_localize_scripts[$handle] );
+					call_user_func_array( 'wp_localize_script', self::$_localize_scripts[ $handle ] );
 				}
 				wp_enqueue_script( $handle );
 			}
@@ -158,7 +157,6 @@ class WPEMS_Assets {
 		 */
 		return str_replace( $base_url, $path, $uri );
 	}
-
 }
 
 /**

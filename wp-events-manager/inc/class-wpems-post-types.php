@@ -6,7 +6,8 @@
  * @package       WP-Events-Manager/Class
  * @version       2.1.7.3
  */
-
+use WPEMS\Models\EventPostModel;
+use WPEMS\Models\BookingPostModel;
 /**
  * Prevent loading this file directly
  */
@@ -306,7 +307,6 @@ class WPEMS_Custom_Post_Types {
 				)
 			)
 		);
-
 	}
 
 	/**
@@ -348,41 +348,45 @@ class WPEMS_Custom_Post_Types {
 	 * @param type $post_id
 	 */
 	public function event_column_content( $column, $post_id ) {
-		$event = WPEMS_Event::instance( $post_id );
+		$event = EventPostModel::find( absint( $post_id ) );
+		if ( ! $event ) {
+			return;
+		}
+
 		switch ( $column ) {
 			case 'status':
-				echo $status = get_post_meta( $post_id, 'tp_event_status', true );
+				echo esc_html( $event->get_status() );
 				break;
 			case 'start':
-				$date_start = get_post_meta( $post_id, 'tp_event_date_start', true );
-				$time_start = get_post_meta( $post_id, 'tp_event_time_start', true );
+				$date_start = $event->get_date_start();
+				$time_start = $event->get_time_start();
 				if ( $date_start ) {
-					printf( '%s', date( get_option( 'date_format' ), strtotime( $date_start ) ) );
+					printf( '%s', esc_html( date( get_option( 'date_format' ), strtotime( $date_start ) ) ) );
 				}
 				if ( $time_start ) {
-					printf( ' %s', date( get_option( 'time_format' ), strtotime( $time_start ) ) );
+					printf( ' %s', esc_html( date( get_option( 'time_format' ), strtotime( $time_start ) ) ) );
 				}
 				break;
 			case 'end':
-				$date_end = get_post_meta( $post_id, 'tp_event_date_end', true );
-				$time_end = get_post_meta( $post_id, 'tp_event_time_end', true );
+				$date_end = $event->get_date_end();
+				$time_end = $event->get_time_end();
 				if ( $date_end ) {
-					printf( '%s', date( get_option( 'date_format' ), strtotime( $date_end ) ) );
+					printf( '%s', esc_html( date( get_option( 'date_format' ), strtotime( $date_end ) ) ) );
 				}
 				if ( $time_end ) {
-					printf( ' %s', date( get_option( 'time_format' ), strtotime( $time_end ) ) );
+					printf( ' %s', esc_html( date( get_option( 'time_format' ), strtotime( $time_end ) ) ) );
 				}
 				break;
 			case 'price':
 				if ( $event->is_free() ) {
-					echo '<span class="event_auth_event_type">' . __( 'Free', 'wp-events-manager' ) . '</span>';
+					echo '<span class="event_auth_event_type">' . esc_html__( 'Free', 'wp-events-manager' ) . '</span>';
 				} else {
-					echo sprintf( __( '<span class="event_auth_event_type">%1$s/%2$s</span>', 'wp-events-manager' ), wpems_format_price( $event->get_price() ), __( 'slot', 'wp-events-manager' ) );
+					echo wp_kses_post( sprintf( '<span class="event_auth_event_type">%1$s/%2$s</span>', wpems_format_price( $event->get_price() ), esc_html__( 'slot', 'wp-events-manager' ) ) );
 				}
 				break;
 			case 'booked_slot':
-				$total = get_post_meta( $post_id, 'tp_event_qty', true ) ? get_post_meta( $post_id, 'tp_event_qty', true ) : esc_html__( 'Unlimited', 'wp-events-manager' );
-				echo sprintf( '%s / %s', $event->booked_quantity(), $total );
+				$total = $event->get_quantity() ? $event->get_quantity() : esc_html__( 'Unlimited', 'wp-events-manager' );
+				echo esc_html( sprintf( '%s / %s', $event->booked_quantity(), $total ) );
 				break;
 			default:
 				break;
@@ -417,36 +421,44 @@ class WPEMS_Custom_Post_Types {
 	 * @param $booking_id
 	 */
 	public function booking_column_content( $column, $booking_id ) {
-		$booking = WPEMS_Booking::instance( $booking_id );
+		$booking = BookingPostModel::find( absint( $booking_id ) );
+		if ( ! $booking ) {
+			return;
+		}
+
 		switch ( $column ) {
 			case 'ID':
-				echo sprintf( '<a href="%s">%s</a>', get_edit_post_link( $booking->ID ), wpems_format_ID( $booking_id ) );
+				printf( '<a href="%s">%s</a>', esc_url( get_edit_post_link( $booking->get_id() ) ), esc_html( wpems_format_ID( $booking_id ) ) );
 				break;
 			case 'event':
-				echo sprintf( '<a href="%s">%s</a>', get_edit_post_link( $booking->event_id ), get_the_title( $booking->event_id ) );
+				printf( '<a href="%s">%s</a>', esc_url( get_edit_post_link( $booking->get_event_id() ) ), esc_html( get_the_title( $booking->get_event_id() ) ) );
 				break;
 			case 'user':
-				$user     = get_userdata( $booking->user_id );
+				$user     = get_userdata( $booking->get_user_id() );
 				$return   = array();
-				$return[] = sprintf( __( '<a href="%1$s">%2$s</a>', 'wp-events-manager' ), admin_url( 'admin.php?page=tp-event-users&user_id=' . $booking->user_id ), $user->display_name );
+				$return[] = sprintf(
+					'<a href="%1$s">%2$s</a>',
+					esc_url( admin_url( 'admin.php?page=tp-event-users&user_id=' . $booking->get_user_id() ) ),
+					$user ? esc_html( $user->display_name ) : ''
+				);
 				$return   = implode( '', $return );
-				echo $return;
+				echo wp_kses_post( $return );
 				break;
 			case 'booking_date':
-				echo get_the_date( '', $booking->ID );
+				echo esc_html( get_the_date( '', $booking->get_id() ) );
 				break;
 			case 'cost':
-				echo $booking->price > 0 ? wpems_format_price( $booking->price ) : __( 'Free', 'wp-events-manager' );
+				echo $booking->get_price() > 0 ? wp_kses_post( wpems_format_price( $booking->get_price() ) ) : esc_html__( 'Free', 'wp-events-manager' );
 				break;
 			case 'slot':
-				echo $booking->qty;
+				echo esc_html( $booking->get_quantity() );
 				break;
 			case 'status':
 				$return   = array();
-				$return[] = sprintf( '%s', wpems_booking_status( $booking_id ) );
-				$return[] = $booking->payment_id ? '<p>' . __( sprintf( '(via %s)', wpems_get_payment_title( $booking->payment_id ) ), 'wp-events-manager' ) . '</p>' : '';
+				$return[] = wpems_booking_status( $booking_id );
+				$return[] = $booking->get_payment_id() ? '<p>' . sprintf( esc_html__( '(via %s)', 'wp-events-manager' ), esc_html( wpems_get_payment_title( $booking->get_payment_id() ) ) ) . '</p>' : '';
 				$return   = implode( '', $return );
-				echo $return;
+				echo wp_kses_post( $return );
 				break;
 			default:
 				break;
@@ -477,21 +489,38 @@ class WPEMS_Custom_Post_Types {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return false;
 		}
-		if ( ! ( is_admin() && isset( $_REQUEST['post_type'] ) && $_REQUEST['post_type'] == 'tp_event' ) ) {
+		$post_type = isset( $_REQUEST['post_type'] ) ? sanitize_key( wp_unslash( $_REQUEST['post_type'] ) ) : '';
+		if ( ! ( is_admin() && 'tp_event' === $post_type ) ) {
 			return false;
 		}
 
-		if ( ! isset( $_REQUEST['orderby'] ) || ! in_array(
-			$_REQUEST['orderby'],
-			array(
-				'event_start_date',
-				'event_end_date',
-			)
-		) ) {
+		if ( ! $this->get_admin_sort_orderby() ) {
 			return false;
 		}
 
 		return true;
+	}
+
+	/**
+	 * Get sanitized event admin orderby value.
+	 *
+	 * @return string
+	 */
+	private function get_admin_sort_orderby() {
+		$order_by = isset( $_REQUEST['orderby'] ) ? sanitize_key( wp_unslash( $_REQUEST['orderby'] ) ) : '';
+
+		return in_array( $order_by, array( 'event_start_date', 'event_end_date' ), true ) ? $order_by : '';
+	}
+
+	/**
+	 * Get sanitized event admin order direction.
+	 *
+	 * @return string
+	 */
+	private function get_admin_sort_order() {
+		$order = isset( $_REQUEST['order'] ) ? strtoupper( sanitize_key( wp_unslash( $_REQUEST['order'] ) ) ) : 'ASC';
+
+		return in_array( $order, array( 'ASC', 'DESC' ), true ) ? $order : 'ASC';
 	}
 
 	/**
@@ -506,14 +535,14 @@ class WPEMS_Custom_Post_Types {
 
 		global $wpdb;
 
-		$order_by = $_REQUEST['orderby'];
+		$order_by = $this->get_admin_sort_orderby();
 
-		if ( $order_by == 'event_start_date' ) {
-			$join .= " INNER JOIN {$wpdb->prefix}postmeta AS event_date ON event_date.post_id = {$wpdb->prefix}posts.ID AND event_date.meta_key = 'tp_event_date_start' ";
+		if ( 'event_start_date' === $order_by ) {
+			$join .= " INNER JOIN {$wpdb->postmeta} AS event_date ON event_date.post_id = {$wpdb->posts}.ID AND event_date.meta_key = 'tp_event_date_start' ";
 		}
 
-		if ( $order_by == 'event_end_date' ) {
-			$join .= " INNER JOIN {$wpdb->prefix}postmeta AS event_date ON event_date.post_id = {$wpdb->prefix}posts.ID AND event_date.meta_key = 'tp_event_date_end' ";
+		if ( 'event_end_date' === $order_by ) {
+			$join .= " INNER JOIN {$wpdb->postmeta} AS event_date ON event_date.post_id = {$wpdb->posts}.ID AND event_date.meta_key = 'tp_event_date_end' ";
 		}
 
 		return $join;
@@ -529,13 +558,7 @@ class WPEMS_Custom_Post_Types {
 			return $order_by;
 		}
 
-		$order          = isset( $_REQUEST['order'] ) ? $_REQUEST['order'] : 'asc';
-		$order          = strtoupper( $order );
-		$allowed_orders = [ 'ASC', 'DESC' ];
-
-		if ( ! in_array( $order, $allowed_orders, true ) ) {
-			$order = 'ASC';
-		}
+		$order = $this->get_admin_sort_order();
 
 		return "event_date.meta_value {$order}";
 	}
@@ -553,7 +576,7 @@ class WPEMS_Custom_Post_Types {
 		if ( isset( $_GET['user_id'] ) && 'event_auth_book' === $typenow ) {
 			// Status
 			$query->query_vars['meta_key']   = 'ea_booking_user_id';
-			$query->query_vars['meta_value'] = absint( sanitize_text_field( $_GET['user_id'] ) );
+			$query->query_vars['meta_value'] = absint( wp_unslash( $_GET['user_id'] ) );
 		}
 
 		return $query;
@@ -580,7 +603,7 @@ class WPEMS_Custom_Post_Types {
 			3  => __( 'Custom field deleted.', 'wp-events-manager' ),
 			4  => __( 'Event updated.', 'wp-events-manager' ),
 			/* translators: %s: date and time of the revision */
-			5  => isset( $_GET['revision'] ) ? sprintf( __( 'Book restored to revision from %s', 'wp-events-manager' ), wp_post_revision_title( (int) $_GET['revision'], false ) ) : false,
+			5  => isset( $_GET['revision'] ) ? sprintf( __( 'Book restored to revision from %s', 'wp-events-manager' ), wp_post_revision_title( absint( wp_unslash( $_GET['revision'] ) ), false ) ) : false,
 			6  => __( 'Event updated.', 'wp-events-manager' ),
 			7  => __( 'Event saved.', 'wp-events-manager' ),
 			8  => __( 'Event submitted.', 'wp-events-manager' ),
@@ -610,11 +633,10 @@ class WPEMS_Custom_Post_Types {
 	}
 
 	public function wpems_events_archive( $query ) {
-		echo'<pre>';
+		echo '<pre>';
 		print_r( $query );
 		die;
 	}
-
 }
 
 new WPEMS_Custom_Post_Types();

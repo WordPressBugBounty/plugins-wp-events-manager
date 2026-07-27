@@ -8,13 +8,17 @@
  * @package       WP-Events-Manager/Template
  * @version       2.1.7
  */
-
+use WPEMS\Models\EventPostModel;
 /**
  * Prevent loading this file directly
  */
 defined( 'ABSPATH' ) || exit();
 
-$event    = new WPEMS_Event( $event_id );
+$event = EventPostModel::find( absint( $event_id ) );
+if ( ! $event ) {
+	return;
+}
+
 $user_reg = $event->booked_quantity( get_current_user_id() );
 ?>
 
@@ -30,7 +34,7 @@ $user_reg = $event->booked_quantity( get_current_user_id() );
 		<?php } else { ?>
 			<div class="event_auth_form_field">
 				<label for="event_register_qty"><?php _e( 'Quantity', 'wp-events-manager' ); ?></label>
-				<input type="number" name="qty" value="1" min="1" max="<?php echo $event->get_slot_available(); ?>" id="event_register_qty" />
+				<input type="number" name="qty" value="1" min="1" max="<?php echo esc_attr( $event->get_slot_available() ); ?>" id="event_register_qty" />
 			</div>
 		<?php } ?>
 
@@ -47,7 +51,7 @@ $user_reg = $event->booked_quantity( get_current_user_id() );
 							<input id="payment_method_<?php echo esc_attr( $id ); ?>" type="radio" name="payment_method" value="<?php echo esc_attr( $id ); ?>"<?php echo $i === 0 ? ' checked' : ''; ?>/>
 							<label for="payment_method_<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $payment->get_title() ); ?></label>
 						</li>
-						<?php $i ++; ?>
+						<?php ++$i; ?>
 					<?php endforeach; ?>
 				</ul>
 				<?php

@@ -22,8 +22,7 @@ if ( ! ( is_post_type_archive( 'tp_event' ) ) ) {
 }
 ?>
 <form method="get" name="search-events" class="search-events-form">
-	<input type="text" name="s" class="search-events-input" value="<?php echo $s; ?>"
-		   placeholder="<?php _e( 'Search events...', 'wp-events-manager' ); ?>"/>
+	<input type="text" name="s" class="search-events-input" value="<?php echo esc_attr( $s ); ?>" placeholder="<?php esc_attr_e( 'Search events...', 'wp-events-manager' ); ?>"/>
 	<input type="hidden" name="ref" value="events"/>
-	<button class="search-event-button"><?php _e( 'Search', 'wp-events-manager' ); ?></button>
+	<button class="search-event-button"><?php esc_html_e( 'Search', 'wp-events-manager' ); ?></button>
 </form>

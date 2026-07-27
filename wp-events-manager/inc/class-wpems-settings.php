@@ -1,149 +1,15 @@
 <?php
 /**
- * WP Events Manager Settings class
+ * Legacy settings class shim.
  *
- * @author        ThimPress, leehld
- * @package       WP-Events-Manager/Class
- * @version       2.1.7
+ * @package WP-Events-Manager/Class
  */
 
-/**
- * Prevent loading this file directly
- */
 defined( 'ABSPATH' ) || exit;
 
-class WPEMS_Settings {
-
+if ( ! class_exists( 'WPEMS_Settings', false ) ) {
 	/**
-	 * $_options
-	 * @var null
+	 * Backward-compatible global settings class.
 	 */
-	public $_options = null;
-
-	/**
-	 * prefix option name
-	 * @var string
-	 */
-	public $_prefix = 'thimpress_events';
-
-	/**
-	 * _instance
-	 * @var null
-	 */
-	static $_instance = null;
-
-	public function __construct( $prefix = null ) {
-		if ( $prefix ) {
-			$this->_prefix = $prefix;
-		}
-
-		// load options
-		if ( ! $this->_options ) {
-			$this->_options = $this->options();
-		}
-	}
-
-	public function __get( $id = null ) {
-		$settings = apply_filters( 'tp_event_settings_field', array() );
-
-		if ( isset( $settings[ $id ] ) ) {
-			return $settings[ $id ];
-		}
-	}
-
-	/**
-	 * options load options
-	 * @return array || null
-	 */
-	protected function options() {
-		$options = get_option( $this->_prefix, [] );
-
-		return $options;
-	}
-
-	/**
-	 * get_name_field
-	 *
-	 * @param  $name of field option
-	 *
-	 * @return string name field
-	 */
-	public function get_field_name( $name = null ) {
-		if ( ! $this->_prefix || ! $name ) {
-			return;
-		}
-
-		return $this->_prefix . '[' . $name . ']';
-	}
-
-	/**
-	 * get_name_field
-	 *
-	 * @param  $name of field option
-	 *
-	 * @return string name field
-	 */
-	public function get_field_id( $name = null, $default = null ) {
-		if ( ! $this->_prefix || ! $name ) {
-			return;
-		}
-
-		return $this->_prefix . '_' . $name;
-	}
-
-	/**
-	 * get option value
-	 *
-	 * @param  $name
-	 *
-	 * @return option value. array, string, boolean
-	 */
-	public function get( $name = null, $default = null ) {
-		if ( ! $this->_options ) {
-			$this->_options = $this->options();
-		}
-
-		if ( $name && isset( $this->_options[ $name ] ) ) {
-			return $this->_options[ $name ];
-		}
-
-		return $default;
-	}
-
-	/**
-	 * get option value
-	 *
-	 * @param  $name
-	 *
-	 * @return option value. array, string, boolean
-	 */
-	public function set( $name = null, $default = null ) {
-		if ( ! $this->_options ) {
-			$this->_options = $this->options();
-		}
-
-		if ( $name && isset( $this->_options[ $name ] ) ) {
-			return $this->_options[ $name ];
-		}
-
-		return $default;
-	}
-
-	/**
-	 * instance
-	 *
-	 * @param  $prefix
-	 *
-	 * @return object class
-	 */
-	public static function instance( $prefix = null ) {
-
-		if ( ! empty( self::$_instance[ $prefix ] ) ) {
-
-			return $GLOBALS['event_auth_settings'] = self::$_instance[ $prefix ];
-		}
-
-		return $GLOBALS['event_auth_settings'] = self::$_instance[ $prefix ] = new self( $prefix );
-	}
-
+	class WPEMS_Settings extends \WPEMS\Settings {}
 }

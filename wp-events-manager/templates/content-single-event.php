@@ -20,7 +20,6 @@ defined( 'ABSPATH' ) || exit();
 	<?php
 	/**
 	 * tp_event_before_single_event hook
-	 *
 	 */
 	do_action( 'tp_event_before_single_event' );
 	?>

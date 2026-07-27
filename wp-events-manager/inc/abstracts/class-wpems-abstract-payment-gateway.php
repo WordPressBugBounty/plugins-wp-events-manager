@@ -16,12 +16,14 @@ abstract class WPEMS_Abstract_Payment_Gateway {
 
 	/**
 	 * id of payment
+	 *
 	 * @var null
 	 */
 	protected $id = null;
 
 	/**
 	 * payment title
+	 *
 	 * @var null
 	 */
 	protected $title = null;
@@ -46,30 +48,31 @@ abstract class WPEMS_Abstract_Payment_Gateway {
 
 	/**
 	 * payment process
+	 *
 	 * @return null
 	 */
 	protected function process( $event_id = false ) {
-
 	}
 
 	/**
 	 * refund action
+	 *
 	 * @return null
 	 */
 	protected function refund() {
-
 	}
 
 	/**
 	 * payment send email
+	 *
 	 * @return null
 	 */
 	public function send_email() {
-
 	}
 
 	/**
 	 * admin setting fields
+	 *
 	 * @return array
 	 */
 	public function admin_fields() {
@@ -78,6 +81,7 @@ abstract class WPEMS_Abstract_Payment_Gateway {
 
 	/**
 	 * enable
+	 *
 	 * @return boolean
 	 */
 	public function is_enable() {
@@ -89,13 +93,14 @@ abstract class WPEMS_Abstract_Payment_Gateway {
 
 	/**
 	 * event_auth_gateways fontend display
+	 *
 	 * @return html
 	 */
 	public function event_auth_gateways() {
 		$html = array();
 
 		$html[] = '<input id="payment_method_' . esc_attr( $this->id ) . '" type="radio" name="payment_method" value="' . esc_attr( $this->id ) . '"/>';
-		$html[] = '<label for="payment_method_' . esc_attr( $this->id ) . '"><img width="115" height="50" src="' . esc_attr( $this->_icon ) . '" /></label>';
+		$html[] = '<label for="payment_method_' . esc_attr( $this->id ) . '"><img width="115" height="50" src="' . esc_url( $this->icon ) . '" alt="' . esc_attr( $this->get_title() ) . '" /></label>';
 
 		echo implode( '', $html );
 	}
@@ -106,6 +111,7 @@ abstract class WPEMS_Abstract_Payment_Gateway {
 
 	/**
 	 * add notice message completed when payment completed
+	 *
 	 * @return null
 	 */
 	public function completed_process_message() {
@@ -113,7 +119,4 @@ abstract class WPEMS_Abstract_Payment_Gateway {
 			tp_event_has_notice( 'success', __( 'Payment completed. We will send you email when payment method verify.', 'wp-events-manager' ) );
 		}
 	}
-
 }
-
-

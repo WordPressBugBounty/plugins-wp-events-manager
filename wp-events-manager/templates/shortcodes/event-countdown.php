@@ -6,7 +6,7 @@
  *
  * @author        ThimPress, leehld
  * @package       WP-Events-Manager/Template
- * @version       2.1.7
+ * @version       2.1.8
  */
 
 /**
@@ -14,11 +14,26 @@
  */
 defined( 'ABSPATH' ) || exit();
 
-if ( $args['event_id'] ) {
-	$ids = explode( ',', $args['event_id'] );
+if ( ! isset( $args ) ) {
+	return;
+}
+
+$event_id = $args['event_id'] ?? '';
+
+if ( ! empty( $event_id ) ) {
+	$ids = explode( ',', $event_id );
 	foreach ( $ids as $id ) {
+		$id = absint( $id );
+		if ( $id <= 0 ) {
+			continue;
+		}
+
 		$event = get_post( $id );
-		echo '<h2><a href="' . get_permalink( $id ) . '"> ' . get_the_title( $id ) . '</a></h2>';
+		if ( ! $event ) {
+			continue;
+		}
+
+		printf( '<h2><a href="%s">%s</a></h2>', esc_url( get_permalink( $id ) ), esc_html( get_the_title( $id ) ) );
 
 		$current_time = current_time( 'Y-m-d H:i' );
 		$time         = wpems_get_time( 'Y-m-d H:i', $event, false ); ?>

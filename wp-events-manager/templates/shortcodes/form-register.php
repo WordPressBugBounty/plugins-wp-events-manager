@@ -15,18 +15,19 @@
 defined( 'ABSPATH' ) || exit();
 
 wpems_print_notices();
+$redirect_to = home_url( isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '/' );
 ?>
 
 <form name="event_auth_register_form" action="" method="post" class="event-auth-form">
 
 	<p class="form-row form-required">
 		<label for="user_login"><?php _e( 'Username', 'wp-events-manager' ); ?><span class="required">*</span></label>
-		<input type="text" name="user_login" id="user_login" class="input" value="<?php echo esc_attr( ! empty( $_POST['user_login'] ) ? sanitize_text_field( $_POST['user_login'] ) : '' ); ?>" size="20" />
+		<input type="text" name="user_login" id="user_login" class="input" value="<?php echo esc_attr( ! empty( $_POST['user_login'] ) ? sanitize_text_field( wp_unslash( $_POST['user_login'] ) ) : '' ); ?>" size="20" />
 	</p>
 
 	<p class="form-row form-required">
 		<label for="user_email"><?php _e( 'Email', 'wp-events-manager' ); ?><span class="required">*</span></label>
-		<input type="email" name="user_email" id="user_email" class="input" value="<?php echo esc_attr( ! empty( $_POST['user_email'] ) ? sanitize_text_field( $_POST['user_email'] ) : '' ); ?>" size="25" />
+		<input type="email" name="user_email" id="user_email" class="input" value="<?php echo esc_attr( ! empty( $_POST['user_email'] ) ? sanitize_email( wp_unslash( $_POST['user_email'] ) ) : '' ); ?>" size="25" />
 	</p>
 
 	<p class="form-row form-required">
@@ -49,7 +50,7 @@ wpems_print_notices();
 	<?php endif; ?>
 
 	<p class="submit form-row">
-		<input type="hidden" name="redirect_to" value="<?php echo esc_attr( ( is_ssl() ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] ); ?>" />
+		<input type="hidden" name="redirect_to" value="<?php echo esc_url( $redirect_to ); ?>" />
 		<?php wp_nonce_field( 'auth-reigter-nonce', 'auth-nonce' ); ?>
 		<input type="submit" name="wp-submit" id="wp-submit" class="button button-primary button-large" value="<?php esc_attr_e( 'Register', 'wp-events-manager' ); ?>" />
 	</p>

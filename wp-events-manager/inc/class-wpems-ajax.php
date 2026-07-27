@@ -6,7 +6,8 @@
  * @package       WP-Events-Manager/Class
  * @version       2.1.7
  */
-
+use WPEMS\Models\EventPostModel;
+use WPEMS\Models\BookingPostModel;
 /**
  * Prevent loading this file directly
  */
@@ -22,7 +23,7 @@ class WPEMS_Ajax {
 		// key is action ajax: wp_ajax_{action}
 		// value is allow ajax nopriv: wp_ajax_nopriv_{action}
 		$actions = array(
-			'event_remove_notice' => true,
+			'event_remove_notice' => false,
 			'event_auth_register' => false,
 			'event_login_action'  => true,
 			'load_form_register'  => true,
@@ -42,10 +43,11 @@ class WPEMS_Ajax {
 	 * Remove admin notice
 	 */
 	public function event_remove_notice() {
+		check_ajax_referer( 'event_remove_notice', 'event_remove_notice_nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			$error = new WP_Error( __( 'Permission denied', 'wp-events-manager' ) );
-			wp_send_json_error( $error );
+			wp_send_json_error( $error, 403 );
 		}
 
 		if ( is_multisite() ) {
@@ -64,14 +66,16 @@ class WPEMS_Ajax {
 
 	/**
 	 * load form register
+	 *
 	 * @return html login form if user not logged in || @return html register event form
 	 */
 	public function load_form_register() {
-		if ( empty( $_POST['nonce'] ) || ! wp_verify_nonce( $_POST['nonce'], 'event-auth-register-nonce' ) ) {
-			return;
+		$nonce = ! empty( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+		if ( ! $nonce || ! wp_verify_nonce( $nonce, 'event-auth-register-nonce' ) ) {
+			wp_die( '', 403 );
 		}
 
-		$event_id = ! empty( $_POST['event_id'] ) ? absint( $_POST['event_id'] ) : 0;
+		$event_id = ! empty( $_POST['event_id'] ) ? absint( wp_unslash( $_POST['event_id'] ) ) : 0;
 
 		if ( ! $event_id ) {
 			wpems_add_notice( 'error', __( 'Event not found.', 'wp-events-manager' ) );
@@ -81,10 +85,15 @@ class WPEMS_Ajax {
 			wpems_print_notices( 'error', __( 'You must login before register ', 'wp-events-manager' ) . sprintf( ' <strong>%s</strong>', get_the_title( $event_id ) ) );
 			die();
 		} else {
-			$event           = new WPEMS_Event( $event_id );
+			$event = EventPostModel::find( $event_id );
+			if ( ! $event ) {
+				wpems_print_notices( 'error', __( 'Event not found.', 'wp-events-manager' ) );
+				die();
+			}
+
 			$registered_time = $event->booked_quantity( get_current_user_id() );
 			ob_start();
-			if ( get_post_meta( $event_id, 'tp_event_status', true ) === 'expired' ) {
+			if ( $event->get_status() === 'expired' ) {
 				wpems_print_notices( 'error', sprintf( '%s %s', get_the_title( $event_id ), __( 'has been expired', 'wp-events-manager' ) ) );
 			} elseif ( $registered_time && wpems_get_option( 'email_register_times' ) === 'once' && $event->is_free() ) {
 				wpems_print_notices( 'error', __( 'You have registered this event before', 'wp-events-manager' ) );
@@ -110,32 +119,44 @@ class WPEMS_Ajax {
 	public function event_auth_register() {
 		try {
 			// sanitize, validate data
-			if ( $_SERVER['REQUEST_METHOD'] !== 'POST' ) {
+			$request_method = isset( $_SERVER['REQUEST_METHOD'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) : '';
+			if ( 'POST' !== $request_method ) {
 				throw new Exception( __( 'Invalid request', 'wp-events-manager' ) );
 			}
 
-			if ( ! isset( $_POST['action'] ) || ! check_ajax_referer( 'event_auth_register_nonce', 'event_auth_register_nonce' ) ) {
+			$action = isset( $_POST['action'] ) ? sanitize_key( wp_unslash( $_POST['action'] ) ) : '';
+			if ( 'event_auth_register' !== $action ) {
 				throw new Exception( __( 'Invalid request', 'wp-events-manager' ) );
 			}
+			check_ajax_referer( 'event_auth_register_nonce', 'event_auth_register_nonce' );
 
-			$event_id = false;
-			if ( ! isset( $_POST['event_id'] ) || ! is_numeric( $_POST['event_id'] ) ) {
+			$event_id     = false;
+			$raw_event_id = isset( $_POST['event_id'] ) ? wp_unslash( $_POST['event_id'] ) : '';
+			if ( '' === $raw_event_id || ! is_numeric( $raw_event_id ) ) {
 				throw new Exception( __( 'Invalid event request', 'wp-events-manager' ) );
 			} else {
-				$event_id = absint( sanitize_text_field( $_POST['event_id'] ) );
+				$event_id = absint( $raw_event_id );
 			}
 
-			$qty = 0;
-			if ( ! isset( $_POST['qty'] ) || ! is_numeric( $_POST['qty'] ) ) {
+			$qty     = 0;
+			$raw_qty = isset( $_POST['qty'] ) ? wp_unslash( $_POST['qty'] ) : '';
+			if ( '' === $raw_qty || ! is_numeric( $raw_qty ) ) {
 				throw new Exception( __( 'Quantity must integer', 'wp-events-manager' ) );
 			} else {
-				$qty = absint( sanitize_text_field( $_POST['qty'] ) );
+				$qty = absint( $raw_qty );
+			}
+
+			if ( $qty < 1 ) {
+				throw new Exception( __( 'Quantity must integer', 'wp-events-manager' ) );
 			}
 
 			// End sanitize, validate data
 			// load booking module
-			$booking = WPEMS_Booking::instance();
-			$event   = WPEMS_Event::instance( $event_id );
+			$booking = new BookingPostModel();
+			$event   = EventPostModel::find( $event_id );
+			if ( ! $event ) {
+				throw new Exception( __( 'Event not found.', 'wp-events-manager' ) );
+			}
 
 			$user       = wp_get_current_user();
 			$registered = $event->booked_quantity( $user->ID );
@@ -144,13 +165,13 @@ class WPEMS_Ajax {
 				throw new Exception( __( 'You are registered this event.', 'wp-events-manager' ) );
 			}
 
-			if ( $event->booked_quantity() >= get_post_meta( $event_id, 'tp_event_qty', true ) ) {
+			if ( $event->get_quantity() && ( $event->booked_quantity() + $qty > $event->get_quantity() ) ) {
 				throw new Exception( __( 'There is not any slots now. Please try with next future events!', 'wp-events-manager' ) );
 			}
 
 			$payment_methods = wpems_payment_gateways();
 
-			$payment = isset( $_POST['payment_method'] ) ? sanitize_text_field( $_POST['payment_method'] ) : false;
+			$payment = isset( $_POST['payment_method'] ) ? sanitize_key( wp_unslash( $_POST['payment_method'] ) ) : false;
 
 			// create new book return $booking_id if success and WP Error if fail
 			$args = apply_filters(
@@ -172,7 +193,7 @@ class WPEMS_Ajax {
 				throw new Exception( sprintf( '%s %s', get_title(), __( 'is not ready. Please contact administrator to setup payment gateways', 'wp-events-manager' ) ) );
 			}
 
-			if ( $payment->id == 'woo_payment' ) {
+			if ( $payment && $payment->id == 'woo_payment' ) {
 
 				do_action( 'tp_event_register_event_action', $args );
 				$return = $payment->process( $event_id );
@@ -184,39 +205,42 @@ class WPEMS_Ajax {
 				// create booking result
 				if ( is_wp_error( $booking_id ) ) {
 					throw new Exception( $booking_id->get_error_message() );
-				} else {
-					if ( $args['price'] == 0 ) {
+				} elseif ( $args['price'] == 0 ) {
 						// update booking status
-						$book = WPEMS_Booking::instance( $booking_id );
-						$book->update_status();
-
-						// user booking
-						$user = get_userdata( $book->user_id );
-						wpems_add_notice( 'success', sprintf( __( 'Book ID <strong>%1$s</strong> completed! We\'ll send mail to <strong>%2$s</strong> when it is approve.', 'wp-events-manager' ), wpems_format_ID( $booking_id ), $user->user_email ) );
-						wp_send_json(
-							apply_filters(
-								'event_auth_register_ajax_result',
-								array(
-									'status' => true,
-									'url'    => wpems_account_url(),
-								)
-							)
-						);
-					} elseif ( $payment ) {
-
-						$return = $payment->process( $booking_id );
-						if ( isset( $return['status'] ) && $return['status'] === false ) {
-							wp_delete_post( $booking_id );
-						}
-						wp_send_json( $return );
-					} else {
-						wp_send_json(
-							array(
-								'status'  => false,
-								'message' => __( 'Payment method is not available', 'wp-events-manager' ),
-							)
-						);
+					$book = BookingPostModel::find( $booking_id );
+					if ( ! $book ) {
+						throw new Exception( __( 'Booking ID is not exists!', 'wp-events-manager' ) );
 					}
+
+					$book->update_status();
+
+					// user booking
+					$user       = get_userdata( $book->get_user_id() );
+					$user_email = $user && ! empty( $user->user_email ) ? $user->user_email : '';
+					wpems_add_notice( 'success', sprintf( __( 'Book ID <strong>%1$s</strong> completed! We\'ll send mail to <strong>%2$s</strong> when it is approve.', 'wp-events-manager' ), wpems_format_ID( $booking_id ), $user_email ) );
+					wp_send_json(
+						apply_filters(
+							'event_auth_register_ajax_result',
+							array(
+								'status' => true,
+								'url'    => wpems_account_url(),
+							)
+						)
+					);
+				} elseif ( $payment ) {
+
+					$return = $payment->process( $booking_id );
+					if ( isset( $return['status'] ) && $return['status'] === false ) {
+						wp_delete_post( $booking_id );
+					}
+					wp_send_json( $return );
+				} else {
+					wp_send_json(
+						array(
+							'status'  => false,
+							'message' => __( 'Payment method is not available', 'wp-events-manager' ),
+						)
+					);
 				}
 			}
 		} catch ( Exception $e ) {
@@ -241,12 +265,11 @@ class WPEMS_Ajax {
 		wp_send_json(
 			array(
 				'status'  => false,
-				'message' => sprintf( __( 'You Must <a href="%s">Login</a>', 'wp-events-manager' ), tp_event_login_url() ),
+				'message' => sprintf( __( 'You Must <a href="%s">Login</a>', 'wp-events-manager' ), esc_url( wpems_login_url() ) ),
 			)
 		);
 		die();
 	}
-
 }
 
 // initialize ajax class process

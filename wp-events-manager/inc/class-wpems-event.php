@@ -14,9 +14,9 @@ defined( 'ABSPATH' ) || exit;
 
 class WPEMS_Event {
 
-	public $post     = null;
-	public $ID       = null;
-	static $instance = null;
+	public $post            = null;
+	public $ID              = null;
+	public static $instance = null;
 
 	public function __construct( $id = null ) {
 		if ( is_numeric( $id ) && $id && get_post_type( $id ) === 'tp_event' ) {
@@ -49,6 +49,7 @@ class WPEMS_Event {
 
 	/**
 	 * get event title
+	 *
 	 * @return string
 	 */
 	public function get_title() {
@@ -57,6 +58,7 @@ class WPEMS_Event {
 
 	/**
 	 * is free
+	 *
 	 * @return type boolean
 	 */
 	public function is_free() {
@@ -65,6 +67,7 @@ class WPEMS_Event {
 
 	/**
 	 * get price
+	 *
 	 * @return type float
 	 */
 	public function get_price() {
@@ -73,6 +76,7 @@ class WPEMS_Event {
 
 	/**
 	 * registered
+	 *
 	 * @global type $wpdb
 	 * @return array
 	 */
@@ -103,6 +107,7 @@ class WPEMS_Event {
 
 	/**
 	 * get available slot
+	 *
 	 * @return type
 	 */
 	public function get_slot_available() {
@@ -111,6 +116,7 @@ class WPEMS_Event {
 
 	/**
 	 * register time
+	 *
 	 * @return init
 	 */
 	public function get_registered_time() {
@@ -119,9 +125,10 @@ class WPEMS_Event {
 
 	/**
 	 * get booked quantity
+	 *
 	 * @global type $wpdb
 	 *
-	 * @param type  $user_id
+	 * @param type $user_id
 	 *
 	 * @return init
 	 */
@@ -205,7 +212,8 @@ class WPEMS_Event {
 			return self::$instance[ $event_id ];
 		}
 
-		return self::$instance[ $event_id ] = new self( $event_id );
-	}
+		self::$instance[ $event_id ] = new self( $event_id );
 
+		return self::$instance[ $event_id ];
+	}
 }

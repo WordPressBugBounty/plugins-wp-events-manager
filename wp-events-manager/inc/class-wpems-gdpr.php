@@ -74,7 +74,10 @@ class WPEMS_GDPR {
 		$bookings = $this->_query_booking( $user->ID );
 
 		foreach ( $bookings as $booking_id ) {
-			$booking = WPEMS_Booking::instance( $booking_id );
+			$booking = \WPEMS\Models\BookingPostModel::find( absint( $booking_id ) );
+			if ( ! $booking ) {
+				continue;
+			}
 
 			$post_data_to_export = array(
 				array(
@@ -91,15 +94,15 @@ class WPEMS_GDPR {
 				),
 				array(
 					'name'  => __( 'Items', 'wp-events-manager' ),
-					'value' => get_the_title( $booking->event_id ),
+					'value' => get_the_title( $booking->get_event_id() ),
 				),
 				array(
 					'name'  => __( 'Total', 'wp-events-manager' ),
-					'value' => wpems_format_price( floatval( $booking->price ), $booking->currency ),
+					'value' => wpems_format_price( $booking->get_price(), $booking->get_currency() ),
 				),
 				array(
 					'name'  => __( 'Payment Method', 'wp-events-manager' ),
-					'value' => $booking->payment_id ? wpems_get_payment_title( $booking->payment_id ) : __( 'No payment', 'wp-events-manager' ),
+					'value' => $booking->get_payment_id() ? wpems_get_payment_title( $booking->get_payment_id() ) : __( 'No payment', 'wp-events-manager' ),
 				),
 				array(
 					'name'  => __( 'Status', 'wp-events-manager' ),
@@ -168,10 +171,10 @@ class WPEMS_GDPR {
 				SELECT booking.ID FROM {$wpdb->prefix}posts AS booking 
 				INNER JOIN {$wpdb->prefix}postmeta AS booking_meta ON booking.ID = booking_meta.post_id
 				WHERE 
-				booking.post_type = %s AND booking_meta.meta_key = %s AND booking_meta.meta_value = %s",
+				booking.post_type = %s AND booking_meta.meta_key = %s AND booking_meta.meta_value = %d",
 				'event_auth_book',
 				'ea_booking_user_id',
-				$user_id
+				absint( $user_id )
 			),
 			ARRAY_A
 		);

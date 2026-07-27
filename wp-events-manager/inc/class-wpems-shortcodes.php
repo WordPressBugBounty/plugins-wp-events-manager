@@ -21,6 +21,11 @@ class WPEMS_Shortcodes {
 	 * Init shortcodes
 	 */
 	public static function init() {
+		if ( class_exists( '\WPEMS\ShortCodes\EventShortCodes' ) ) {
+			\WPEMS\ShortCodes\EventShortCodes::init();
+			return;
+		}
+
 		add_action( 'tp_event_shortcode_wrapper_start', array( __CLASS__, 'shortcode_wrapper_start' ) );
 		add_action( 'tp_event_shortcode_wrapper_end', array( __CLASS__, 'shortcode_wrapper_end' ) );
 
@@ -57,15 +62,19 @@ class WPEMS_Shortcodes {
 
 		$page_id = array();
 
-		if ( $register_id = wpems_get_page_id( 'register' ) ) {
+		$register_id = wpems_get_page_id( 'register' );
+		if ( $register_id ) {
 			$page_id[] = $register_id;
 		}
-		if ( $login_id = wpems_get_page_id( 'login' ) ) {
+
+		$login_id = wpems_get_page_id( 'login' );
+		if ( $login_id ) {
 			$page_id[] = $login_id;
 		}
 
 		if ( is_user_logged_in() && in_array( $post->ID, $page_id ) ) {
 			wp_safe_redirect( home_url( '/' ) );
+			exit;
 		}
 	}
 
@@ -90,7 +99,7 @@ class WPEMS_Shortcodes {
 	 *
 	 * @param string $shortcode
 	 * @param string $template
-	 * @param array $atts
+	 * @param array  $atts
 	 *
 	 * @return string
 	 */
@@ -113,7 +122,7 @@ class WPEMS_Shortcodes {
 	public static function list_event( $atts ) {
 		$args = array( 'post_type' => 'tp_event' );
 
-		return WPEMS_Shortcodes::render( 'list-event', 'event-list.php', array( 'args' => $args ) );
+		return self::render( 'list-event', 'event-list.php', array( 'args' => $args ) );
 	}
 
 
@@ -130,22 +139,22 @@ class WPEMS_Shortcodes {
 			return '';
 		}
 		if ( ! get_option( 'users_can_register' ) ) {
-			return WPEMS_Shortcodes::render( 'user-register', 'user-cannot-register.php' );
+			return self::render( 'user-register', 'user-cannot-register.php' );
 		} elseif ( ! empty( $_REQUEST['registered'] ) ) {
-			$email = sanitize_email( $_REQUEST['registered'] );
+			$email = sanitize_email( wp_unslash( $_REQUEST['registered'] ) );
 			$user  = get_user_by( 'email', $email );
 			if ( $user && $user->ID ) {
 				wp_new_user_notification( $user->ID, null, 'user' );
 
 				// register completed
-				return WPEMS_Shortcodes::render( 'user-register', 'register-completed.php' );
+				return self::render( 'user-register', 'register-completed.php' );
 			} else {
 				// error
-				return WPEMS_Shortcodes::render( 'user-register', 'register-error.php' );
+				return self::render( 'user-register', 'register-error.php' );
 			}
 		} elseif ( ! is_user_logged_in() ) {
 			// show register form
-			return WPEMS_Shortcodes::render( 'user-register', 'form-register.php' );
+			return self::render( 'user-register', 'form-register.php' );
 		}
 
 		return '';
@@ -163,7 +172,7 @@ class WPEMS_Shortcodes {
 			return '';
 		}
 
-		return WPEMS_Shortcodes::render( 'user-login', 'form-login.php' );
+		return self::render( 'user-login', 'form-login.php' );
 	}
 
 	/**
@@ -178,11 +187,11 @@ class WPEMS_Shortcodes {
 			return '';
 		}
 
-		$checkemail = isset( $_REQUEST['checkemail'] ) && $_REQUEST['checkemail'] === 'confirm' ? true : false;
+		$checkemail = isset( $_REQUEST['checkemail'] ) && 'confirm' === sanitize_text_field( wp_unslash( $_REQUEST['checkemail'] ) ) ? true : false;
 		if ( $checkemail ) {
 			wpems_add_notice( 'success', __( 'Check your email for a link to reset your password.', 'wp-events-manager' ) );
 		} else {
-			return WPEMS_Shortcodes::render( 'forgot-password', 'forgot-password.php' );
+			return self::render( 'forgot-password', 'forgot-password.php' );
 		}
 
 		return '';
@@ -203,8 +212,8 @@ class WPEMS_Shortcodes {
 		$atts = wp_parse_args(
 			$atts,
 			array(
-				'key'   => isset( $_REQUEST['key'] ) ? sanitize_text_field( $_REQUEST['key'] ) : '',
-				'login' => isset( $_REQUEST['login'] ) ? sanitize_text_field( $_REQUEST['login'] ) : '',
+				'key'   => isset( $_REQUEST['key'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['key'] ) ) : '',
+				'login' => isset( $_REQUEST['login'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['login'] ) ) : '',
 			)
 		);
 
@@ -213,7 +222,7 @@ class WPEMS_Shortcodes {
 			array(
 				'user_login'  => '',
 				'redirect_to' => '',
-				'checkemail'  => isset( $_REQUEST['checkemail'] ) && $_REQUEST['checkemail'] === 'confirm' ? true : false,
+				'checkemail'  => isset( $_REQUEST['checkemail'] ) && 'confirm' === sanitize_text_field( wp_unslash( $_REQUEST['checkemail'] ) ) ? true : false,
 			)
 		);
 
@@ -221,8 +230,7 @@ class WPEMS_Shortcodes {
 			wpems_add_notice( 'success', __( 'Check your email for a link to reset your password.', 'wp-events-manager' ) );
 		}
 
-		return WPEMS_Shortcodes::render( 'reset-password', 'reset-password.php', array( 'atts' => $atts ) );
-
+		return self::render( 'reset-password', 'reset-password.php', array( 'atts' => $atts ) );
 	}
 
 	/**
@@ -244,7 +252,7 @@ class WPEMS_Shortcodes {
 			),
 		);
 
-		return WPEMS_Shortcodes::render( 'user-account', 'user-account.php', array( 'args' => $args ) );
+		return self::render( 'user-account', 'user-account.php', array( 'args' => $args ) );
 	}
 
 	/**
@@ -262,9 +270,8 @@ class WPEMS_Shortcodes {
 			$atts
 		);
 
-		return WPEMS_Shortcodes::render( 'event-countdown', 'event-countdown.php', array( 'args' => $atts ) );
+		return self::render( 'event-countdown', 'event-countdown.php', array( 'args' => $atts ) );
 	}
-
 }
 
 WPEMS_Shortcodes::init();

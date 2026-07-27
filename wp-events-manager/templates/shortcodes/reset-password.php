@@ -21,7 +21,7 @@ wpems_print_notices();
 
 	<div class="user-pass1-wrap">
 		<p class="form-row required">
-			<label for="pass1"><?php _e( 'Password', 'wp-events-manager' ); ?></label>
+			<label for="pass1"><?php esc_html_e( 'Password', 'wp-events-manager' ); ?></label>
 		</p>
 
 		<div class="wp-pwd">
@@ -33,7 +33,7 @@ wpems_print_notices();
 
 	<div class="user-pass2-wrap">
 		<p class="form-row required">
-			<label for="pass2"><?php _e( 'Confirm Password', 'wp-events-manager' ); ?></label>
+			<label for="pass2"><?php esc_html_e( 'Confirm Password', 'wp-events-manager' ); ?></label>
 		</p>
 
 		<div class="wp-pwd">
@@ -43,7 +43,7 @@ wpems_print_notices();
 		</div>
 	</div>
 
-	<p class="description indicator-hint"><?php echo wp_get_password_hint(); ?></p>
+	<p class="description indicator-hint"><?php echo wp_kses_post( wp_get_password_hint() ); ?></p>
 
 	<?php
 	/**
@@ -63,14 +63,14 @@ wpems_print_notices();
 
 <p id="nav">
 	<?php if ( ! is_user_logged_in() ) : ?>
-		<a href="<?php echo esc_url( wp_login_url() ); ?>"><?php _e( 'Log in', 'wp-events-manager' ); ?></a>
+		<a href="<?php echo esc_url( wp_login_url() ); ?>"><?php esc_html_e( 'Log in', 'wp-events-manager' ); ?></a>
 	<?php endif; ?>
 	<?php
 	if ( get_option( 'users_can_register' ) ) :
-		$registration_url = sprintf( '<a href="%s">%s</a>', esc_url( wp_registration_url() ), __( 'Register', 'wp-events-manager' ) );
+		$registration_url = sprintf( '<a href="%s">%s</a>', esc_url( wp_registration_url() ), esc_html__( 'Register', 'wp-events-manager' ) );
 
 		/** This filter is documented in wp-includes/general-template.php */
-		echo ' | ' . $registration_url;
+		echo wp_kses_post( ' | ' . $registration_url );
 	endif;
 	?>
 </p>

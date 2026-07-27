@@ -17,7 +17,13 @@ defined( 'ABSPATH' ) || exit();
 wpems_print_notices();
 
 printf(
-	__( 'You have successfully registered to <strong>%1$s</strong>. We have emailed your password to <i>%2$s</i> the email address you entered.', 'wp-events-manager' ),
-	get_bloginfo( 'name' ),
-	sanitize_text_field( $_REQUEST['registered'] )
+	wp_kses(
+		__( 'You have successfully registered to <strong>%1$s</strong>. We have emailed your password to <i>%2$s</i> the email address you entered.', 'wp-events-manager' ),
+		array(
+			'strong' => array(),
+			'i'      => array(),
+		)
+	),
+	esc_html( get_bloginfo( 'name' ) ),
+	esc_html( sanitize_email( wp_unslash( $_REQUEST['registered'] ?? '' ) ) )
 );

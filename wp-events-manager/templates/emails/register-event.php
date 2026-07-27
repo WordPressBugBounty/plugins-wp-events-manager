@@ -33,6 +33,6 @@ if ( ! $booking || ! $user || ! $email_body ) {
 	</style>
 </head>
 <body>
-<?php printf( $email_body ); ?>
+<?php echo wp_kses_post( $email_body ); ?>
 </body>
 </html>

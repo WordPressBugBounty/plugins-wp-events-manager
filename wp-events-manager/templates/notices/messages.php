@@ -16,6 +16,10 @@ defined( 'ABSPATH' ) || exit();
 
 if ( ! empty( $messages ) ) {
 	foreach ( $messages as $code => $msgs ) {
+		$code = sanitize_key( $code );
+		if ( ! in_array( $code, array( 'success', 'error' ), true ) ) {
+			continue;
+		}
 		wpems_get_template( 'notices/' . $code . '.php', array( 'messages' => $msgs ) );
 	}
 }

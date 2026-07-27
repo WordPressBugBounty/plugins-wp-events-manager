@@ -4,7 +4,7 @@
  * Plugin URI: http://thimpress.com/
  * Description: A complete plugin for Events management and online booking system
  * Author: ThimPress
- * Version: 2.2.4
+ * Version: 2.2.5
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author URI: http://thimpress.com
@@ -12,6 +12,15 @@
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit();
+}
+
+/**
+ * Load Composer autoloader for PSR-4 namespaced classes.
+ *
+ * @since 2.3.0
+ */
+if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
+	require_once __DIR__ . '/vendor/autoload.php';
 }
 
 /**
@@ -40,28 +49,21 @@ if ( ! class_exists( 'WPEMS' ) ) {
 			}
 		}
 
-		/**
-		 * Define Plugins Constants
-		 */
-		public function define_constants() {
-			$this->set_define( 'WPEMS_PATH', plugin_dir_path( __FILE__ ) );
-			$this->set_define( 'WPEMS_URI', plugin_dir_url( __FILE__ ) );
-			$this->set_define( 'WPEMS_INC', WPEMS_PATH . 'inc/' );
-			$this->set_define( 'WPEMS_INC_URI', WPEMS_URI . 'inc/' );
-			$this->set_define( 'WPEMS_ASSETS_URI', WPEMS_URI . 'assets/' );
-			$this->set_define( 'WPEMS_LIB_URI', WPEMS_INC_URI . 'libraries/' );
-			$this->set_define( 'WPEMS_VER', '2.1.8' );
-			$this->set_define( 'WPEMS_MAIN_FILE', __FILE__ );
-		}
-
-		public function set_define( $name = '', $value = '' ) {
-			if ( $name && ! defined( $name ) ) {
-				define( $name, $value );
-			}
-		}
+        public function define_constants() {
+            define( 'WPEMS_MAIN_FILE', __FILE__ );
+            define( 'WPEMS_PATH', plugin_dir_path( WPEMS_MAIN_FILE ) );
+            define( 'WPEMS_URI', plugin_dir_url( WPEMS_MAIN_FILE ) );
+            define( 'WPEMS_PLUGIN_BASE', plugin_basename( WPEMS_MAIN_FILE ) );
+            define( 'WPEMS_INC', WPEMS_PATH . 'inc/' );
+            define( 'WPEMS_INC_URI', WPEMS_URI . 'inc/' );
+            define( 'WPEMS_ASSETS_URI', WPEMS_URI . 'assets/' );
+            define( 'WPEMS_LIB_URI', WPEMS_INC_URI . 'libraries/' );
+            define( 'WPEMS_VER', '2.1.8' );
+        }
 
 		/**
 		 * Init hooks plugins
+		 *
 		 * @since 2.0
 		 */
 		public function init_hooks() {
@@ -101,7 +103,7 @@ if ( ! class_exists( 'WPEMS' ) ) {
 			$this->settings = WPEMS_Settings::instance();
 
 			if ( is_admin() ) {
-				$this->_include( 'inc/admin/class-wpems-admin.php' );
+				\WPEMS\Admin\Admin::init();
 			} else {
 				$this->_include( 'inc/class-wpems-template.php' );
 				$this->_include( 'inc/class-wpems-frontend-assets.php' );
@@ -132,21 +134,39 @@ if ( ! class_exists( 'WPEMS' ) ) {
 		public function _include( $file = null ) {
 			if ( is_array( $file ) ) {
 				foreach ( $file as $key => $f ) {
-					if ( file_exists( WPEMS_PATH . $f ) ) {
-						require_once WPEMS_PATH . $f;
-					}
+					$this->include_plugin_file( $f );
 				}
 			} else {
-				if ( file_exists( WPEMS_PATH . $file ) ) {
-					require_once WPEMS_PATH . $file;
-				} elseif ( file_exists( $file ) ) {
-					require_once $file;
-				}
+				$this->include_plugin_file( $file );
 			}
 		}
 
 		/**
+		 * Include a plugin file only when it resolves inside this plugin.
+		 *
+		 * @param string|null $file Relative plugin file path.
+		 *
+		 * @return bool
+		 */
+		private function include_plugin_file( $file = null ) {
+			if ( ! $file || ! is_string( $file ) ) {
+				return false;
+			}
+
+			$base_path = realpath( WPEMS_PATH );
+			$file_path = realpath( WPEMS_PATH . ltrim( $file, '/\\' ) );
+			if ( ! $base_path || ! $file_path || 0 !== strpos( $file_path, $base_path . DIRECTORY_SEPARATOR ) ) {
+				return false;
+			}
+
+			require_once $file_path;
+
+			return true;
+		}
+
+		/**
 		 * load text domain
+		 *
 		 * @return null
 		 */
 		public function text_domain() {
@@ -166,6 +186,7 @@ if ( ! class_exists( 'WPEMS' ) ) {
 
 		/**
 		 * get instance class
+		 *
 		 * @return WPEMS
 		 */
 		public static function instance() {
@@ -175,7 +196,6 @@ if ( ! class_exists( 'WPEMS' ) ) {
 
 			return self::$_instance = new self();
 		}
-
 	}
 
 	if ( ! function_exists( 'WPEMS' ) ) {

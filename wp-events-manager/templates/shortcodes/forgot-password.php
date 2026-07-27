@@ -14,9 +14,11 @@
  */
 defined( 'ABSPATH' ) || exit();
 wpems_print_notices();
+$redirect_to = home_url( isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '/' );
+$checkemail  = isset( $_REQUEST['checkemail'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['checkemail'] ) ) : '';
 ?>
 
-<?php if ( empty( $_REQUEST['checkemail'] ) ) : ?>
+<?php if ( empty( $checkemail ) ) : ?>
 
 	<form name="forgot-password" class="forgot-password event-auth-form" action="" method="post">
 
@@ -25,7 +27,7 @@ wpems_print_notices();
 		</p>
 		<p class="form-row required">
 			<label for="user_login" ><?php _e( 'Username or Email:', 'wp-events-manager' ); ?>
-				<input type="text" name="user_login" id="user_login" class="input" value="<?php echo esc_attr( ! empty( $_POST['user_login'] ) ? sanitize_text_field( $_POST['user_login'] ) : '' ); ?>" size="20" /></label>
+				<input type="text" name="user_login" id="user_login" class="input" value="<?php echo esc_attr( ! empty( $_POST['user_login'] ) ? sanitize_text_field( wp_unslash( $_POST['user_login'] ) ) : '' ); ?>" size="20" /></label>
 		</p>
 	<?php
 	/**
@@ -35,7 +37,7 @@ wpems_print_notices();
 	 */
 	do_action( 'tp_event_forgot_password_form' );
 	?>
-		<input type="hidden" name="redirect_to" value="<?php echo esc_attr( ( is_ssl() ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] ); ?>" />
+		<input type="hidden" name="redirect_to" value="<?php echo esc_url( $redirect_to ); ?>" />
 		<p class="form-row submit">
 			<input type="submit" name="wp-submit" id="wp-submit" class="button button-primary button-large" value="<?php esc_attr_e( 'Get New Password', 'wp-events-manager' ); ?>" />
 		</p>
@@ -43,12 +45,12 @@ wpems_print_notices();
 	</form>
 
 	<div class="event_auth_lost_pass_footer">
-		<a href="<?php echo esc_attr( wpems_login_url() ); ?>">
+		<a href="<?php echo esc_url( wpems_login_url() ); ?>">
 			<?php _e( 'Login', 'wp-events-manager' ); ?>
 		</a> | 
 		<?php if ( ! is_user_logged_in() ) : ?>
 
-			<a href="<?php echo esc_attr( wpems_register_url() ); ?>">
+			<a href="<?php echo esc_url( wpems_register_url() ); ?>">
 				<?php _e( 'Create new user', 'wp-events-manager' ); ?>
 			</a>
 

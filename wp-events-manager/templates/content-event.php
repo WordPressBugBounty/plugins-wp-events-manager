@@ -18,9 +18,8 @@ defined( 'ABSPATH' ) || exit();
 <?php
 	/**
 	 * tp_event_before_loop_event hook
-	 *
 	 */
-	 do_action( 'tp_event_before_loop_event' );
+	do_action( 'tp_event_before_loop_event' );
 
 if ( post_password_required() ) {
 	echo get_the_password_form();

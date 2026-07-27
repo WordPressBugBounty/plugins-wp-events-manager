@@ -36,8 +36,8 @@ if ( ! $booking || ! $user ) {
 
 <?php
 printf(
-	__( 'User have been registered successful <a href="%s">your event</a>.', 'wp-events-manager' ),
-	get_permalink( $booking->event_id )
+	wp_kses_post( __( 'User have been registered successful <a href="%s">your event</a>.', 'wp-events-manager' ) ),
+	esc_url( get_permalink( $booking->get_event_id() ) )
 );
 ?>
 
@@ -56,20 +56,20 @@ printf(
 	</thead>
 	<tbody>
 	<tr>
-		<td><?php printf( '%s', wpems_format_ID( $booking->ID ) ); ?></td>
-		<td><?php printf( '%s', $user->data->display_name ); ?></td>
-		<td><?php printf( '<a href="%s">%s</a>', get_permalink( $booking->event_id ), get_the_title( $booking->event_id ) ); ?></td>
-		<td><?php printf( '%s', floatval( $booking->price ) == 0 ? __( 'Free', 'wp-events-manager' ) : __( 'Cost', 'wp-events-manager' ) ); ?></td>
-		<td><?php printf( '%s', $booking->qty ); ?></td>
-		<td><?php printf( '%s', wpems_format_price( floatval( $booking->price ), $booking->currency ) ); ?></td>
-		<td><?php printf( '%s', $booking->payment_id ? wpems_get_payment_title( $booking->payment_id ) : __( 'No payment', 'wp-events-manager' ) ); ?></td>
+		<td><?php echo esc_html( wpems_format_ID( $booking->get_id() ) ); ?></td>
+		<td><?php echo esc_html( $user->data->display_name ); ?></td>
+		<td><?php printf( '<a href="%s">%s</a>', esc_url( get_permalink( $booking->get_event_id() ) ), esc_html( get_the_title( $booking->get_event_id() ) ) ); ?></td>
+		<td><?php echo esc_html( $booking->get_price() == 0 ? __( 'Free', 'wp-events-manager' ) : __( 'Cost', 'wp-events-manager' ) ); ?></td>
+		<td><?php echo esc_html( $booking->get_quantity() ); ?></td>
+		<td><?php echo wp_kses_post( wpems_format_price( $booking->get_price(), $booking->get_currency() ) ); ?></td>
+		<td><?php echo esc_html( $booking->get_payment_id() ? wpems_get_payment_title( $booking->get_payment_id() ) : __( 'No payment', 'wp-events-manager' ) ); ?></td>
 		<td>
 			<?php
 			$return   = array();
-			$return[] = sprintf( '%s', wpems_booking_status( $booking->ID ) );
-			$return[] = $booking->payment_id ? sprintf( '(%s)', wpems_get_payment_title( $booking->payment_id ) ) : '';
+			$return[] = sprintf( '%s', wpems_booking_status( $booking->get_id() ) );
+			$return[] = $booking->get_payment_id() ? sprintf( '(%s)', wpems_get_payment_title( $booking->get_payment_id() ) ) : '';
 			$return   = implode( '', $return );
-			printf( '%s', $return );
+			echo wp_kses_post( $return );
 			?>
 		</td>
 	</tr>

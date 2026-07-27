@@ -8,7 +8,7 @@
  * @package       WP-Events-Manager/Template
  * @version       2.1.7
  */
-
+use WPEMS\Models\EventPostModel;
 /**
  * Prevent loading this file directly
  */
@@ -18,22 +18,26 @@ if ( wpems_get_option( 'allow_register_event' ) == 'no' ) {
 	return;
 }
 
-$event            = new WPEMS_Event( get_the_ID() );
+$event = EventPostModel::find( absint( get_the_ID() ) );
+if ( ! $event ) {
+	return;
+}
+
 $user_reg         = $event->booked_quantity( get_current_user_id() );
-$date_start       = $event->__get( 'date_start' ) ? date( 'Ymd', strtotime( $event->__get( 'date_start' ) ) ) : '';
-$time_start       = $event->__get( 'time_start' ) ? date( 'Hi', strtotime( $event->__get( 'time_start' ) ) ) : '';
-$date_end         = $event->__get( 'date_end' ) ? date( 'Ymd', strtotime( $event->__get( 'date_end' ) ) ) : '';
-$time_end         = $event->__get( 'time_end' ) ? date( 'Hi', strtotime( $event->__get( 'time_end' ) ) ) : '';
+$date_start       = $event->get_date_start() ? date( 'Ymd', strtotime( $event->get_date_start() ) ) : '';
+$time_start       = $event->get_time_start() ? date( 'Hi', strtotime( $event->get_time_start() ) ) : '';
+$date_end         = $event->get_date_end() ? date( 'Ymd', strtotime( $event->get_date_end() ) ) : '';
+$time_end         = $event->get_time_end() ? date( 'Hi', strtotime( $event->get_time_end() ) ) : '';
 $g_calendar_link  = 'http://www.google.com/calendar/event?action=TEMPLATE&text=' . urlencode( $event->get_title() );
 $g_calendar_link .= '&dates=' . $date_start . ( $time_start ? 'T' . $time_start : '' ) . '/' . $date_end . ( $time_end ? 'T' . $time_end : '' );
-$g_calendar_link .= '&details=' . urlencode( $event->post->post_content );
-$g_calendar_link .= '&location=' . urlencode( $event->__get( 'location' ) );
-$g_calendar_link .= '&trp=false&sprop=' . urlencode( get_permalink( $event->ID ) );
+$g_calendar_link .= '&details=' . urlencode( $event->post_content );
+$g_calendar_link .= '&location=' . urlencode( $event->get_location() );
+$g_calendar_link .= '&trp=false&sprop=' . urlencode( get_permalink( $event->get_id() ) );
 $g_calendar_link .= '&sprop=name:' . urlencode( get_option( 'blogname' ) );
 $time_zone        = get_option( 'timezone_string' ) ? get_option( 'timezone_string' ) : 'UTC';
 $g_calendar_link .= '&ctz=' . urlencode( $time_zone );
 
-if ( absint( $event->qty ) == 0 || get_post_meta( get_the_ID(), 'tp_event_status', true ) === 'expired' ) {
+if ( $event->get_quantity() == 0 || $event->get_status() === 'expired' ) {
 	return;
 }
 ?>
@@ -43,7 +47,7 @@ if ( absint( $event->qty ) == 0 || get_post_meta( get_the_ID(), 'tp_event_status
 	<ul class="event-info">
 		<li class="total">
 			<span class="label"><?php _e( 'Total Slot:', 'wp-events-manager' ); ?></span>
-			<span class="detail"><?php echo esc_html( absint( $event->qty ) ); ?></span>
+			<span class="detail"><?php echo esc_html( $event->get_quantity() ); ?></span>
 		</li>
 		<li class="booking_slot">
 			<span class="label"><?php _e( 'Booked Slot:', 'wp-events-manager' ); ?></span>
@@ -51,23 +55,23 @@ if ( absint( $event->qty ) == 0 || get_post_meta( get_the_ID(), 'tp_event_status
 		</li>
 		<li class="price">
 			<span class="label"><?php _e( 'Cost:', 'wp-events-manager' ); ?></span>
-			<span class="detail"><?php printf( '%s', $event->is_free() ? __( 'Free', 'wp-events-manager' ) : wpems_format_price( $event->get_price() ) ); ?></span>
+			<span class="detail"><?php echo $event->is_free() ? esc_html__( 'Free', 'wp-events-manager' ) : wp_kses_post( wpems_format_price( $event->get_price() ) ); ?></span>
 		</li>
 	</ul>
 
 	<?php if ( is_user_logged_in() ) { ?>
-		<a class="wpems_g_calendar_url" href="<?php echo esc_attr( $g_calendar_link ); ?>" target="_blank"><img src="https://www.google.com/calendar/images/ext/gc_button2.gif" alt="0" border="0"></a>
+		<a class="wpems_g_calendar_url" href="<?php echo esc_url( $g_calendar_link ); ?>" target="_blank" rel="noopener noreferrer"><img src="https://www.google.com/calendar/images/ext/gc_button2.gif" alt="0" border="0"></a>
 		<?php
 		$registered_time = $event->booked_quantity( get_current_user_id() );
 		if ( $registered_time && wpems_get_option( 'email_register_times' ) === 'once' && $event->is_free() ) {
 			?>
-			<p><?php echo __( 'You have registered this event before.', 'wp-events-manager' ); ?></p>
+			<p><?php esc_html_e( 'You have registered this event before.', 'wp-events-manager' ); ?></p>
 		<?php } else { ?>
 			<a class="event_register_submit event_auth_button event-load-booking-form"
-			   data-event="<?php echo esc_attr( get_the_ID() ); ?>"><?php _e( 'Register Now', 'wp-events-manager' ); ?></a>
+				data-event="<?php echo esc_attr( get_the_ID() ); ?>"><?php esc_html_e( 'Register Now', 'wp-events-manager' ); ?></a>
 		<?php } ?>
 	<?php } else { ?>
-		<p><?php echo sprintf( __( 'You must <a href="%s">login</a> before register event.', 'wp-events-manager' ), wpems_login_url() ); ?></p>
+		<p><?php printf( wp_kses_post( __( 'You must <a href="%s">login</a> before register event.', 'wp-events-manager' ) ), esc_url( wpems_login_url() ) ); ?></p>
 	<?php } ?>
 
 </div>

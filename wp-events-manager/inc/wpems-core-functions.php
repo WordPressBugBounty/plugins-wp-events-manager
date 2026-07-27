@@ -10,13 +10,141 @@
 /**
  * Prevent loading this file directly
  */
+
+use WPEMS\Widgets\WidgetCountdown;
+
 defined( 'ABSPATH' ) || exit;
 
-add_action( 'widgets_init', 'wpems_register_countdown_widget' );
-if ( ! function_exists( 'wpems_register_countdown_widget' ) ) {
+add_action( 'widgets_init', 'register_widgets' );
+function register_widgets() {
+	//register_widget( 'WPEMS_Widget_Countdown' );
+	register_widget( WidgetCountdown::class );
+}
 
-	function wpems_register_countdown_widget() {
-		register_widget( 'WPEMS_Widget_Countdown' );
+if ( ! function_exists( 'wpems_clean_relative_template_path' ) ) {
+	/**
+	 * Validate a template path fragment before it is used for filesystem lookup.
+	 *
+	 * @param string $path        Relative template path.
+	 * @param bool   $require_php Whether the path must point to a PHP file.
+	 *
+	 * @return string
+	 */
+	function wpems_clean_relative_template_path( $path, $require_php = true ) {
+		$path = str_replace( '\\', '/', (string) $path );
+		$path = trim( $path, " \t\n\r\0\x0B/" );
+
+		if ( '' === $path || false !== strpos( $path, "\0" ) ) {
+			return '';
+		}
+
+		if ( preg_match( '#^[a-z][a-z0-9+\-.]*://#i', $path ) || preg_match( '#^(?:/|[a-z]:/)#i', $path ) ) {
+			return '';
+		}
+
+		$parts = explode( '/', $path );
+		foreach ( $parts as $part ) {
+			if ( '' === $part || '.' === $part || '..' === $part ) {
+				return '';
+			}
+		}
+
+		if ( $require_php && 'php' !== strtolower( pathinfo( $path, PATHINFO_EXTENSION ) ) ) {
+			return '';
+		}
+
+		return $path;
+	}
+}
+
+if ( ! function_exists( 'wpems_normalize_filesystem_path' ) ) {
+	/**
+	 * Normalize filesystem paths for prefix comparison.
+	 *
+	 * @param string $path Filesystem path.
+	 *
+	 * @return string
+	 */
+	function wpems_normalize_filesystem_path( $path ) {
+		$path = str_replace( '\\', '/', (string) $path );
+		$path = rtrim( $path, '/' );
+
+		if ( defined( 'PHP_OS_FAMILY' ) && 'Windows' === PHP_OS_FAMILY ) {
+			$path = strtolower( $path );
+		}
+
+		return $path;
+	}
+}
+
+if ( ! function_exists( 'wpems_get_allowed_template_paths' ) ) {
+	/**
+	 * Get canonical base directories that may contain template files.
+	 *
+	 * @param string $default_path Optional default template directory.
+	 * @param string $filter_name  Filter name for compatibility paths.
+	 *
+	 * @return array
+	 */
+	function wpems_get_allowed_template_paths( $default_path = '', $filter_name = 'wpems_allowed_template_paths' ) {
+		$paths = array( WPEMS_PATH . 'templates/' );
+
+		if ( $default_path ) {
+			$paths[] = $default_path;
+		}
+
+		if ( function_exists( 'get_stylesheet_directory' ) ) {
+			$paths[] = get_stylesheet_directory();
+		}
+
+		if ( function_exists( 'get_template_directory' ) ) {
+			$paths[] = get_template_directory();
+		}
+
+		$paths   = apply_filters( $filter_name, $paths, $default_path );
+		$allowed = array();
+
+		foreach ( (array) $paths as $path ) {
+			$real_path = realpath( $path );
+			if ( $real_path && is_dir( $real_path ) ) {
+				$allowed[] = wpems_normalize_filesystem_path( $real_path );
+			}
+		}
+
+		return array_values( array_unique( $allowed ) );
+	}
+}
+
+if ( ! function_exists( 'wpems_validate_template_file' ) ) {
+	/**
+	 * Ensure a template file is a PHP file inside an allowed template directory.
+	 *
+	 * @param string $file          Candidate template file.
+	 * @param string $default_path  Optional default template directory.
+	 * @param string $allowed_paths_filter Filter name for compatibility paths.
+	 *
+	 * @return string
+	 */
+	function wpems_validate_template_file( $file, $default_path = '', $allowed_paths_filter = 'wpems_allowed_template_paths' ) {
+		if ( ! is_string( $file ) || '' === $file || false !== strpos( $file, "\0" ) ) {
+			return '';
+		}
+
+		$real_file = realpath( $file );
+		if ( ! $real_file || ! is_file( $real_file ) || 'php' !== strtolower( pathinfo( $real_file, PATHINFO_EXTENSION ) ) ) {
+			return '';
+		}
+
+		$real_file     = wpems_normalize_filesystem_path( $real_file );
+		$allowed_paths = wpems_get_allowed_template_paths( $default_path, $allowed_paths_filter );
+
+		foreach ( $allowed_paths as $allowed_path ) {
+			if ( $real_file === $allowed_path || strpos( $real_file, $allowed_path . '/' ) === 0 ) {
+				return $real_file;
+			}
+		}
+
+		return '';
 	}
 }
 
@@ -24,7 +152,11 @@ if ( ! function_exists( 'wpems_get_template' ) ) {
 
 	function wpems_get_template( $template_name, $args = array(), $template_path = '', $default_path = '' ) {
 		if ( $args && is_array( $args ) ) {
-			extract( $args );
+			// extract args
+			foreach ( $args as $key => $value ) {
+				$$key = $value;
+			}
+			unset( $key, $value ); // clean up
 		}
 
 		$located = wpems_locate_template( $template_name, $template_path, $default_path );
@@ -36,10 +168,16 @@ if ( ! function_exists( 'wpems_get_template' ) ) {
 		}
 		// Allow 3rd party plugin filter template file from their plugin
 		$located = apply_filters( 'wpems_get_template', $located, $template_name, $args, $template_path, $default_path );
+		$located = wpems_validate_template_file( $located, $default_path );
+		if ( ! $located ) {
+			_doing_it_wrong( __FUNCTION__, sprintf( '<code>%s</code> is not a valid template file.', esc_html( $template_name ) ), '2.3' );
+
+			return;
+		}
 
 		do_action( 'tp_event_before_template_part', $template_name, $template_path, $located, $args );
 
-		include( $located );
+		include $located;
 
 		do_action( 'tp_event_after_template_part', $template_name, $template_path, $located, $args );
 	}
@@ -52,10 +190,70 @@ if ( ! function_exists( 'wpems_template_path' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wpems_admin_template_path' ) ) {
+	/**
+	 * Get admin template override path inside themes.
+	 *
+	 * @return string
+	 */
+	function wpems_admin_template_path() {
+		return apply_filters( 'wpems_admin_template_path', trailingslashit( wpems_template_path() ) . 'admin' );
+	}
+}
+
+if ( ! function_exists( 'wpems_get_admin_template' ) ) {
+	/**
+	 * Load an admin template from templates/admin.
+	 *
+	 * @param string $template_name Relative admin template name.
+	 * @param array  $args          Template args.
+	 * @param string $template_path Optional theme override path.
+	 * @param string $default_path  Optional default path.
+	 *
+	 * @return void
+	 */
+	function wpems_get_admin_template( $template_name, $args = array(), $template_path = '', $default_path = '' ) {
+		if ( ! $template_path ) {
+			$template_path = wpems_admin_template_path();
+		}
+
+		if ( ! $default_path ) {
+			$default_path = WPEMS_PATH . 'templates/admin/';
+		}
+
+		wpems_get_template( $template_name, $args, $template_path, $default_path );
+	}
+}
+
+if ( ! function_exists( 'wpems_get_admin_template_content' ) ) {
+	/**
+	 * Capture an admin template.
+	 *
+	 * @param string $template_name Relative admin template name.
+	 * @param array  $args          Template args.
+	 * @param string $template_path Optional theme override path.
+	 * @param string $default_path  Optional default path.
+	 *
+	 * @return string
+	 */
+	function wpems_get_admin_template_content( $template_name, $args = array(), $template_path = '', $default_path = '' ) {
+		ob_start();
+		wpems_get_admin_template( $template_name, $args, $template_path, $default_path );
+
+		return ob_get_clean();
+	}
+}
+
 if ( ! function_exists( 'wpems_get_template_part' ) ) {
 
 	function wpems_get_template_part( $slug, $name = '' ) {
 		$template = '';
+		$slug     = wpems_clean_relative_template_path( $slug, false );
+		$name     = '' !== $name ? wpems_clean_relative_template_path( $name, false ) : '';
+
+		if ( ! $slug ) {
+			return '';
+		}
 
 		// Look in yourtheme/slug-name.php and yourtheme/courses-manage/slug-name.php
 		if ( $name ) {
@@ -68,8 +266,8 @@ if ( ! function_exists( 'wpems_get_template_part' ) ) {
 		}
 
 		// Get default slug-name.php
-		if ( ! $template && $name && file_exists( WPEMS_PATH . "/templates/{$slug}-{$name}.php" ) ) {
-			$template = WPEMS_PATH . "/templates/{$slug}-{$name}.php";
+		if ( ! $template && $name ) {
+			$template = wpems_validate_template_file( WPEMS_PATH . "/templates/{$slug}-{$name}.php" );
 		}
 
 		// If template file doesn't exist, look in yourtheme/slug.php and yourtheme/courses-manage/slug.php
@@ -81,7 +279,8 @@ if ( ! function_exists( 'wpems_get_template_part' ) ) {
 		if ( $template ) {
 			$template = apply_filters( 'wpems_get_template_part', $template, $slug, $name );
 		}
-		if ( $template && file_exists( $template ) ) {
+		$template = wpems_validate_template_file( $template );
+		if ( $template ) {
 			load_template( $template, false );
 		}
 
@@ -101,14 +300,20 @@ if ( ! function_exists( 'wpems_get_template_content' ) ) {
 if ( ! function_exists( 'wpems_locate_template' ) ) {
 
 	function wpems_locate_template( $template_name, $template_path = '', $default_path = '' ) {
+		$template_name = wpems_clean_relative_template_path( $template_name );
+		if ( ! $template_name ) {
+			return '';
+		}
 
 		if ( ! $template_path ) {
 			$template_path = wpems_template_path();
 		}
+		$template_path = wpems_clean_relative_template_path( $template_path, false );
 
 		if ( ! $default_path ) {
 			$default_path = WPEMS_PATH . '/templates/';
 		}
+		$default_path = rtrim( $default_path, '/\\' ) . '/';
 
 		$template = null;
 		// Look within passed path within the theme - this is priority
@@ -124,13 +329,16 @@ if ( ! function_exists( 'wpems_locate_template' ) ) {
 		}
 
 		// Return what we found
-		return apply_filters( 'wpems_locate_template', $template, $template_name, $template_path );
+		$template = apply_filters( 'wpems_locate_template', $template, $template_name, $template_path );
+
+		return wpems_validate_template_file( $template, $default_path );
 	}
 }
 if ( ! function_exists( 'is_event_taxonomy' ) ) {
 
 	/**
 	 * Returns true when viewing a room taxonomy archive.
+	 *
 	 * @return bool
 	 */
 	function is_event_taxonomy() {
@@ -296,8 +504,8 @@ if ( ! function_exists( 'wpems_add_property_countdown' ) ) {
 
 		?>
 		<div class="event-google-map-canvas"
-			 style="height: <?php echo $map_args['height']; ?>; width: <?php echo $map_args['width']; ?>"
-			 id="map-canvas-<?php echo $map_args['map_id']; ?>"
+			style="height: <?php echo esc_attr( $map_args['height'] ); ?>; width: <?php echo esc_attr( $map_args['width'] ); ?>"
+			id="map-canvas-<?php echo esc_attr( $map_args['map_id'] ); ?>"
 			<?php foreach ( $map_args['map_data'] as $key => $val ) : ?>
 				<?php if ( ! empty( $val ) ) : ?>
 					data-<?php echo esc_attr( $key ) . '="' . esc_attr( $val ) . '"'; ?>
@@ -311,7 +519,6 @@ add_action( 'tp_event_before_main_content', 'wpems_before_main_content' );
 if ( ! function_exists( 'wpems_before_main_content' ) ) {
 
 	function wpems_before_main_content() {
-
 	}
 }
 
@@ -319,7 +526,6 @@ add_action( 'tp_event_after_main_content', 'wpems_after_main_content' );
 if ( ! function_exists( 'wpems_after_main_content' ) ) {
 
 	function wpems_after_main_content() {
-
 	}
 }
 
@@ -327,7 +533,6 @@ add_action( 'tp_event_before_single_event', 'wpems_before_single_event' );
 if ( ! function_exists( 'wpems_before_single_event' ) ) {
 
 	function wpems_before_single_event() {
-
 	}
 }
 
@@ -335,7 +540,6 @@ add_action( 'tp_event_after_single_event', 'wpems_after_single_event' );
 if ( ! function_exists( 'wpems_after_single_event' ) ) {
 
 	function wpems_after_single_event() {
-
 	}
 }
 
@@ -497,10 +701,10 @@ if ( ! function_exists( 'wpems_create_page' ) ) {
 
 		if ( strlen( $page_content ) > 0 ) {
 			// Search for an existing page with the specified page content (typically a shortcode)
-			$valid_page_found = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type='page' AND post_status NOT IN ( 'pending', 'trash', 'future', 'auto-draft' ) AND post_content LIKE %s LIMIT 1;", "%{$page_content}%" ) );
+			$valid_page_found = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type='page' AND post_status NOT IN ( 'pending', 'trash', 'future', 'auto-draft' ) AND post_content LIKE %s LIMIT 1;", '%' . $wpdb->esc_like( $page_content ) . '%' ) );
 		} else {
 			// Search for an existing page with the specified page slug
-			$valid_page_found = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type='page' AND post_status NOT IN ( 'pending', 'trash', 'future', 'auto-draft' )  AND post_name = %s LIMIT 1;", $slug ) );
+			$valid_page_found = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type='page' AND post_status NOT IN ( 'pending', 'trash', 'future', 'auto-draft' )  AND post_name = %s LIMIT 1;", sanitize_title( $slug ) ) );
 		}
 
 		$valid_page_found = apply_filters( 'event_auth_create_page_id', $valid_page_found, $slug, $page_content );
@@ -516,10 +720,10 @@ if ( ! function_exists( 'wpems_create_page' ) ) {
 		// Search for a matching valid trashed page
 		if ( strlen( $page_content ) > 0 ) {
 			// Search for an existing page with the specified page content (typically a shortcode)
-			$trashed_page_found = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type='page' AND post_status = 'trash' AND post_content LIKE %s LIMIT 1;", "%{$page_content}%" ) );
+			$trashed_page_found = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type='page' AND post_status = 'trash' AND post_content LIKE %s LIMIT 1;", '%' . $wpdb->esc_like( $page_content ) . '%' ) );
 		} else {
 			// Search for an existing page with the specified page slug
-			$trashed_page_found = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type='page' AND post_status = 'trash' AND post_name = %s LIMIT 1;", $slug ) );
+			$trashed_page_found = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type='page' AND post_status = 'trash' AND post_name = %s LIMIT 1;", sanitize_title( $slug ) ) );
 		}
 
 		if ( $trashed_page_found ) {
@@ -655,7 +859,10 @@ if ( ! function_exists( 'wpems_account_url' ) ) {
 if ( ! function_exists( 'wpems_get_current_url' ) ) {
 
 	function wpems_get_current_url() {
-		return ( is_ssl() ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+
+		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
+
+		return esc_url_raw( home_url( $request_uri ) );
 	}
 }
 
@@ -663,6 +870,10 @@ if ( ! function_exists( 'wpems_add_notice' ) ) {
 	function wpems_add_notice( $type = 'error', $msg = '' ) {
 		if ( ! $msg ) {
 			return;
+		}
+		$type = sanitize_key( $type );
+		if ( ! in_array( $type, array( 'success', 'error' ), true ) ) {
+			$type = 'error';
 		}
 		$notices = WPEMS()->_session->get( 'notices', array() );
 		if ( ! isset( $notices[ $type ] ) ) {
@@ -702,16 +913,20 @@ if ( ! function_exists( 'wpems_print_notices' ) ) {
 			ob_start();
 			wpems_get_template( 'notices/messages.php', array( 'messages' => $notices ) );
 			$html = ob_get_clean();
-			echo $html;
+			echo wp_kses_post( $html );
 			WPEMS()->_session->set( 'notices', array() );
 		}
-
 	}
 }
 
 if ( ! function_exists( 'wpems_print_notice' ) ) {
 
 	function wpems_print_notice( $type = 'success', $message = '' ) {
+		$type = sanitize_key( $type );
+		if ( ! in_array( $type, array( 'success', 'error' ), true ) ) {
+			$type = 'success';
+		}
+
 		if ( 'success' === $type ) {
 			$message = apply_filters( 'tp_event_add_message', $message );
 		}
@@ -981,7 +1196,6 @@ if ( ! function_exists( 'wpems_payment_gateways' ) ) {
 	// List payment gateways
 	function wpems_payment_gateways() {
 		return WPEMS_Payment_Gateways::instance()->get_payment_gateways();
-
 	}
 }
 
@@ -990,7 +1204,6 @@ if ( ! function_exists( 'wpems_gateways_enable' ) ) {
 	// List payment gateways
 	function wpems_gateways_enable() {
 		return WPEMS_Payment_Gateways::instance()->get_payment_gateways_enable();
-
 	}
 }
 
@@ -1025,23 +1238,23 @@ if ( ! function_exists( 'wpems_booking_status' ) ) {
 			$return = '';
 			switch ( $status ) {
 				case 'cancelled':
-					# code...
+					// code...
 					$return = sprintf( __( '<span class="event_booking_status cancelled">%s</span>', 'wp-events-manager' ), ucfirst( $status ) );
 					break;
 				case 'pending':
-					# code...
+					// code...
 					$return = sprintf( __( '<span class="event_booking_status pending">%s</span>', 'wp-events-manager' ), ucfirst( $status ) );
 					break;
 				case 'processing':
-					# code...
+					// code...
 					$return = sprintf( __( '<span class="event_booking_status processing">%s</span>', 'wp-events-manager' ), ucfirst( $status ) );
 					break;
 				case 'completed':
-					# code...
+					// code...
 					$return = sprintf( __( '<span class="event_booking_status completed">%s</span>', 'wp-events-manager' ), ucfirst( $status ) );
 					break;
 				default:
-					# code...
+					// code...
 					break;
 			}
 
@@ -1164,13 +1377,13 @@ if ( ! function_exists( 'tp_event_get_booking' ) ) {
 	 *
 	 * @param type $booking_id
 	 *
-	 * @return WPEMS_Booking
+	 * @return false|\WPEMS\Models\BookingPostModel
 	 */
 	function wpems_get_booking( $booking_id ) {
-		return WPEMS_Booking::instance( $booking_id );
+
+		return \WPEMS\Models\BookingPostModel::find( absint( $booking_id ) );
 	}
 }
-
 // filter shortcode
 add_filter( 'the_content', 'wpems_content_filter', 1 );
 if ( ! function_exists( 'wpems_content_filter' ) ) {
@@ -1352,16 +1565,16 @@ function wpems_admin_table_tabs() {
  * when viewing the events taxonomies page.
  */
 function wpems_taxonomies_parent_menu_highlight( $parent_file ) {
-    global $current_screen;
+	global $current_screen;
 
 	// Ensure we're checking a valid taxonomy screen
 	$cs_taxonomy = isset( $current_screen->taxonomy ) ? $current_screen->taxonomy : '';
 
-    if ( $cs_taxonomy === 'tp_event_category' || $cs_taxonomy === 'tp_event_tag' || $cs_taxonomy === 'tp_event_type' ) {
-        $parent_file = 'tp-event-setting';
-    }
+	if ( $cs_taxonomy === 'tp_event_category' || $cs_taxonomy === 'tp_event_tag' || $cs_taxonomy === 'tp_event_type' ) {
+		$parent_file = 'tp-event-setting';
+	}
 
-    return $parent_file;
+	return $parent_file;
 }
 add_filter( 'parent_file', 'wpems_taxonomies_parent_menu_highlight' );
 
@@ -1371,16 +1584,13 @@ if ( is_multisite() ) {
 		add_action( 'network_admin_notices', 'wpems_show_remove_tp_event_notice' );
 		add_action( 'admin_notices', 'wpems_show_remove_tp_event_notice' );
 	}
-} else {
-	if ( ( file_exists( ABSPATH . 'wp-content/plugins/tp-event-auth/tp-event-auth.php' ) || file_exists( ABSPATH . 'wp-content/plugins/tp-event/tp-event.php' ) ) && ! get_option( 'thimpress_events_show_remove_event_auth_notice' ) ) {
+} elseif ( ( file_exists( ABSPATH . 'wp-content/plugins/tp-event-auth/tp-event-auth.php' ) || file_exists( ABSPATH . 'wp-content/plugins/tp-event/tp-event.php' ) ) && ! get_option( 'thimpress_events_show_remove_event_auth_notice' ) ) {
 		add_action( 'admin_notices', 'wpems_show_remove_tp_event_notice' );
-	}
 }
 
 /**
  * Show notice required remove event auth add-on
  */
-
 function wpems_show_remove_tp_event_notice() {
 	?>
 	<div class="notice notice-error tp-event-dismiss-notice is-dismissible">
@@ -1409,7 +1619,7 @@ if ( ! function_exists( 'wpems_post_type_admin_order' ) ) {
 add_filter( 'pre_get_posts', 'wpems_post_type_admin_order' );
 
 
-//=============================================================================================================================================
+// =============================================================================================================================================
 
 /**
  * Support old functions
@@ -1501,7 +1711,7 @@ if ( ! function_exists( 'tp_event_get_template' ) ) {
 
 	function tp_event_get_template( $template_name, $args = array(), $template_path = '', $default_path = '' ) {
 		if ( $args && is_array( $args ) ) {
-			extract( $args );
+			extract( $args, EXTR_SKIP );
 		}
 
 		$located = tp_event_locate_template( $template_name, $template_path, $default_path );
@@ -1513,10 +1723,16 @@ if ( ! function_exists( 'tp_event_get_template' ) ) {
 		}
 		// Allow 3rd party plugin filter template file from their plugin
 		$located = apply_filters( 'tp_event_get_template', $located, $template_name, $args, $template_path, $default_path );
+		$located = wpems_validate_template_file( $located, $default_path, 'tp_event_allowed_template_paths' );
+		if ( ! $located ) {
+			_doing_it_wrong( __FUNCTION__, sprintf( '<code>%s</code> is not a valid template file.', esc_html( $template_name ) ), '2.3' );
+
+			return;
+		}
 
 		do_action( 'tp_event_before_template_part', $template_name, $template_path, $located, $args );
 
-		include( $located );
+		include $located;
 
 		do_action( 'tp_event_after_template_part', $template_name, $template_path, $located, $args );
 	}
@@ -1532,14 +1748,20 @@ if ( ! function_exists( 'tp_event_template_path' ) ) {
 if ( ! function_exists( 'tp_event_locate_template' ) ) {
 
 	function tp_event_locate_template( $template_name, $template_path = '', $default_path = '' ) {
+		$template_name = wpems_clean_relative_template_path( $template_name );
+		if ( ! $template_name ) {
+			return '';
+		}
 
 		if ( ! $template_path ) {
 			$template_path = tp_event_template_path();
 		}
+		$template_path = wpems_clean_relative_template_path( $template_path, false );
 
 		if ( ! $default_path ) {
 			$default_path = WPEMS_PATH . '/templates/';
 		}
+		$default_path = rtrim( $default_path, '/\\' ) . '/';
 
 		$template = null;
 		// Look within passed path within the theme - this is priority
@@ -1555,7 +1777,9 @@ if ( ! function_exists( 'tp_event_locate_template' ) ) {
 		}
 
 		// Return what we found
-		return apply_filters( 'tp_event_locate_template', $template, $template_name, $template_path );
+		$template = apply_filters( 'tp_event_locate_template', $template, $template_name, $template_path );
+
+		return wpems_validate_template_file( $template, $default_path, 'tp_event_allowed_template_paths' );
 	}
 }
 
@@ -1580,7 +1804,7 @@ function wpems_update_status( $post ) {
 			update_post_meta( $post->ID, 'tp_event_status', 'expired' );
 		}
 	}
-	//if(isset($_GET['debug'])){echo'<pre>';print_r(get_option( 'cron' ));die;}
+	// if(isset($_GET['debug'])){echo'<pre>';print_r(get_option( 'cron' ));die;}
 }
 
 add_action( 'the_post', 'wpems_update_status' );
